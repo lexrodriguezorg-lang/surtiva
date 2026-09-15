@@ -1,0 +1,17 @@
+{
+  "name": "surtiva",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "Surtiva: tienda pública y portales comerciales, un solo catálogo.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "dev": "node scripts/build.mjs && node scripts/serve.mjs",
+    "preview": "node scripts/serve.mjs",
+    "publicar": "node scripts/publicar-github.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

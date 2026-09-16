@@ -1,7 +1,7 @@
 {
   "project": "yirefmallnkgbckrbvrw",
-  "date": "2026-09-16T15:13:23.078Z",
-  "appUrl": "http://localhost:3000",
+  "date": "2026-09-16T15:17:50.225Z",
+  "appUrl": "https://surtiva-o3hj.vercel.app",
   "method": "Real Supabase Auth passwords + user JWT + PostgREST RLS; no service key",
   "organizations": [
     {
@@ -116,5 +116,23 @@
     }
   ],
   "anonymousReadStatus": 401,
-  "passed": true
+  "passed": true,
+  "afterTest": {
+    "date": "2026-09-16T15:19:00.483Z",
+    "organizationsSuspended": true,
+    "checks": [
+      {
+        "user": "A",
+        "status": "suspended",
+        "activeMemberships": 0,
+        "privateProductRows": 0
+      },
+      {
+        "user": "B",
+        "status": "suspended",
+        "activeMemberships": 0,
+        "privateProductRows": 0
+      }
+    ]
+  }
 }

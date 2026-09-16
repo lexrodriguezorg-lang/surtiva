@@ -45,10 +45,14 @@ Las regresiones antiguas usan migraciones 001–005. tests/production-model.test
 
 Se crearon dos organizaciones de prueba en Supabase. scripts/test-hosted-isolation.mjs inicia sesión con dos cuentas sintéticas, consulta PostgREST con cada JWT y comprueba datos propios, cero filas ajenas, denegación de administración global y bloqueo de API entre tenants. El informe sin credenciales está en docs/PRUEBA-AISLAMIENTO-REMOTA.json.
 
-Las credenciales de pruebas permanecen solo en .work/hosted-fixture.json, ignorado por Git. scripts/prepare-hosted-tests.mjs prepara el payload, pero no lo aplica automáticamente. Al finalizar, suspender las organizaciones de prueba sin borrar la evidencia.
+Las credenciales de pruebas permanecen solo en .work/hosted-fixture.json, ignorado por Git. scripts/prepare-hosted-tests.mjs prepara el payload, pero no lo aplica automáticamente. Las dos organizaciones quedaron suspendidas al finalizar; se comprobó que ya no leen productos ni tienen membresías efectivas en la API. No se borró la evidencia.
+
+La prueba remota se ejecutó con APP_TEST_URL=https://surtiva-o3hj.vercel.app y node --use-system-ca --env-file=.env.local scripts/test-hosted-isolation.mjs. Para repetirla se deben reactivar expresamente solo las organizaciones marcadas is_test y suspenderlas de nuevo al terminar. Nunca utilizar cuentas comerciales reales para estas pruebas.
 
 Supabase confirmó cero tablas públicas sin RLS. Los avisos SECURITY DEFINER son intencionales: comandos transaccionales que comprueban identidad, rol, estado, tenant y asignación. La tabla privada de activación deniega todo acceso de aplicación y por eso no tiene políticas. Queda como configuración Auth adicional la protección de contraseñas filtradas. [Aviso sobre funciones](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
 
 ## Despliegue y límites
 
 Cada bloque se compila, prueba y publica primero en Preview. Verificar health, login, RLS y rechazo anónimo antes de actualizar main. Ante una incidencia mantener la portada y acceso cerrado; nunca restaurar el selector de perfiles de la demo. Respaldar datos antes de nuevas migraciones. No hay pagos ni integraciones comerciales externas.
+
+El 16 de septiembre de 2026 se publicó la versión 0.9.0 en la URL de producción verificada. Pasaron 17 pruebas automatizadas, build/check y la prueba remota bilateral con Auth real. Vercel confirmó Ready y no devolvió errores de ejecución en la consulta del despliegue. La activación personal del administrador y la entrega real de correo quedan pendientes de la verificación del propietario; guardar las URLs de redirección no demuestra entrega SMTP.

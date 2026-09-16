@@ -43,6 +43,19 @@ test('verified session cannot query another tenant or arbitrary table',async()=>
  assert.equal((await call(handler,req('data/platform_admins?organization='+ids.org,'GET',undefined,headers))).status,403);
  assert.equal(calls.some(u=>u.includes('/rest/v1/products?')),false);
 });
+test('a distributor cannot query the owner catalogue, CRM, or profile review endpoints',async()=>{
+ const queried=[];
+ const handler=createHandler({env,fetcher:async url=>{
+  queried.push(url);
+  if(url.endsWith('/auth/v1/user'))return response({id:ids.owner,email:'owner@example.test',email_confirmed_at:'2026-01-01'});
+  if(url.includes('/memberships?'))return response([{organization_id:ids.org,role_id:'distributor_admin',status:'active'}]);
+  if(url.includes('/organizations?'))return response([{id:ids.org,status:'active',kind:'distribuidor'}]);
+  return response([]);
+ }});
+ for(const path of ['admin/data/products','admin/data/prospects','admin/review-data?resource=clients&membership='+ids.seller])assert.equal((await call(handler,req(path,'GET',undefined,{authorization:'Bearer distributor'}))).status,403);
+ assert.equal((await call(handler,req('admin/prospects','POST',{name:'Attempt'},{authorization:'Bearer distributor'}))).status,403);
+ assert.equal(queried.some(url=>url.includes('/rest/v1/prospects')||url.includes('/rpc/review_workspace')),false);
+});
 test('public registration rejects platform roles and never sets an authenticated cookie',async()=>{
  const bodies=[];const handler=createHandler({env,fetcher:async(url,options)=>{bodies.push(JSON.parse(options.body));return response({user:{id:ids.pending}});}});
  const form={name:'A',email:'a@example.test',password:'long-password',organization:'Company',role:'admin'};

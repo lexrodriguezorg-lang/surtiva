@@ -86,6 +86,33 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    }
    const user=await identity(service,token);const ctx=await context(service,token,user);
    if(path==='session'&&req.method==='GET')return reply(200,ctx);
+   if(path.startsWith('admin/data/')&&req.method==='GET') {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    const resource=path.slice('admin/data/'.length);
+    if(!['products','inventory','orders','order_items','order_events','clients','sellers','suppliers','invoices','commissions','followups','memberships','commercial_agents','prospects'].includes(resource))throw new HttpError(403,'Recurso no disponible.');
+    const offset=Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000)));
+    const orgs=ctx.organizations.filter(o=>!o.is_test).map(o=>validId(o.id));
+    const global=['commercial_agents','prospects'].includes(resource);
+    if(!global&&!orgs.length)return reply(200,[]);
+    const order=resource==='inventory'?'product_id':resource==='products'?'sku,id':'id';
+    const limit=url.searchParams.get('limit')==='500'?500:100;
+    return reply(200,await service.db(resource+'?select='+(resource==='memberships'?'*,profiles(name)':'*')+'&limit='+limit+'&offset='+offset+'&order='+order+(global?'':'&organization_id=in.('+orgs.join(',')+')')+(url.searchParams.has('order')&&['order_items','order_events'].includes(resource)?'&order_id=eq.'+validId(url.searchParams.get('order')):''),{token}));
+   }
+   if(path==='admin/review-data'&&req.method==='GET') {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    const resource=url.searchParams.get('resource'),member=url.searchParams.get('membership');
+    if(!resources[resource])throw new HttpError(403,'Recurso no disponible.');
+    return reply(200,await service.db('rpc/review_workspace',{token,method:'POST',body:{membership_key:validId(member),resource,page_offset:Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000))),required_permission:resources[resource],order_filter:url.searchParams.has('order')?validId(url.searchParams.get('order')):null}}));
+   }
+   if(path==='admin/prospects'&&['POST','PATCH'].includes(req.method)) {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    const payload={name:text(body.name,1,150),city:text(body.city||'Sin ciudad',1,120),contact:text(body.contact||'Sin contacto',1,200),channel:body.channel,status:body.status,notes:text(body.notes||'Sin notas',1,2000),next_date:body.nextDate||null,agent_id:body.agentId?validId(body.agentId):null,estimated_value:Number(body.estimatedValue)||0};
+    const result=await service.db('prospects'+(req.method==='PATCH'?'?id=eq.'+validId(body.id):''),{token,method:req.method,headers:{Prefer:'return=representation'},body:payload});return reply(200,result);
+   }
+   if(path==='admin/agents'&&req.method==='POST') {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    return reply(201,await service.db('commercial_agents',{token,method:'POST',headers:{Prefer:'return=representation'},body:{name:text(body.name,1,150),kind:body.kind,instructions:text(body.instructions||'Sin instrucciones',1,2000)}}));
+   }
    if(path==='admin/requests'&&req.method==='GET') {
     if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
     return reply(200,await service.db('access_requests?select=*,profiles!access_requests_user_id_fkey(name)&order=created_at.desc',{token}));

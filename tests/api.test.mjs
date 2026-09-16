@@ -7,6 +7,25 @@ function req(path,method='GET',body,headers={}) {return {url:'/api/'+path,method
 async function call(handler,request) {const headers={};let body;const res={setHeader:(k,v)=>headers[k]=v,end:v=>body=JSON.parse(v)};await handler(request,res);return {status:res.statusCode,headers,body};}
 const response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 
+test('product edits require a manager, scope the write to its organization and validate price',async()=>{
+ let role='distributor_admin';const writes=[];
+ const handler=createHandler({env,fetcher:async(url,options)=>{
+  if(url.endsWith('/auth/v1/user'))return response({id:ids.owner,email:'owner@example.test',email_confirmed_at:'2026-01-01'});
+  if(url.includes('/memberships?'))return response([{organization_id:ids.org,role_id:role,status:'active'}]);
+  if(url.includes('/organizations?'))return response([{id:ids.org,status:'active',kind:'distribuidor'}]);
+  if(options?.method==='PATCH'){writes.push({url,body:JSON.parse(options.body)});return response([{id:ids.org}]);}
+  return response([]);
+ }});
+ const headers={authorization:'Bearer manager'},body={id:ids.org,title:'Producto',category:'Hogar',price:4200,active:true};
+ assert.equal((await call(handler,req('products?organization='+ids.org2,'PATCH',body,headers))).status,403);
+ assert.equal((await call(handler,req('products?organization='+ids.org,'PATCH',{...body,price:-1},headers))).status,400);
+ role='seller';assert.equal((await call(handler,req('products?organization='+ids.org,'PATCH',body,headers))).status,403);
+ assert.equal(writes.length,0);
+ role='distributor_admin';assert.equal((await call(handler,req('products?organization='+ids.org,'PATCH',body,headers))).status,200);
+ assert.match(writes[0].url,new RegExp('organization_id=eq.'+ids.org));
+ assert.deepEqual(writes[0].body,{title:'Producto',category:'Hogar',price:4200,active:true});
+});
+
 test('custom domain migration permits only explicit origins, including the existing domain',async()=>{
  const handler=createHandler({env:{...env,APP_ORIGIN:'https://surtiva.com.co',APP_ADDITIONAL_ORIGINS:'https://www.surtiva.com.co, https://surtiva-o3hj.vercel.app'}});
  for(const origin of ['https://surtiva.com.co','https://www.surtiva.com.co','https://surtiva-o3hj.vercel.app'])assert.equal((await call(handler,req('auth/logout','POST',{}, {origin}))).status,200);

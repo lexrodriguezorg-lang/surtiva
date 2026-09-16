@@ -8,12 +8,31 @@ test('pilot import contains catalog only and bootstrap grants global access only
  assert.equal(await count(db,'products'),1072);assert.equal(await count(db,'distributor_products'),1072);
  assert.equal(await count(db,'orders'),0);assert.equal(await count(db,'clients'),0);assert.equal(await count(db,'sellers'),0);
  assert.equal((await db.query('select count(*) n from public.inventory where quantity is not null or reserved<>0')).rows[0].n,0);
- await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.admin,'lexrodriguezorg@mail.com',JSON.stringify({name:'Administrador Surtiva',organization_name:'Surtiva',requested_role:'distributor_admin'})]);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.admin,'lexrodriguezorg@mail.com',JSON.stringify({name:'Administrador maestro'})]);
  assert.equal(await count(db,'memberships'),0);
+ assert.equal(await count(db,'access_requests'),0);
  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.admin]);
  assert.equal((await db.query('select role_id from public.memberships')).rows[0].role_id,'surtiva_admin');
  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.admin]);assert.equal(await count(db,'memberships'),1);
  assert.equal((await db.query('select count(*) n from private.owner_bootstrap')).rows[0].n,0);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data,email_confirmed_at) values($1,$2,$3,now())',[ids.other,'another@example.test',JSON.stringify({name:'Another owner',isAdmin:true,role:'surtiva_admin'})]);
+ assert.equal(await count(db,'memberships'),1);
+ await asUser(db,'admin',async()=>{assert.equal(await count(db,'products'),1072);assert.equal((await db.query('select private.is_admin() yes')).rows[0].yes,true);});
+ }finally{await db.close();}
+});
+
+test('only the master administrator can create fulfillment partnerships',async()=>{
+ const db=await database();try{
+ await fixture(db);await migrate(db);
+ await asUser(db,'owner',()=>assert.rejects(db.query("select public.create_invitation($1,'partner@example.test','Aliado','fulfillment_partner')",[ids.org]),/administrador maestro/));
+ await assert.rejects(db.query("insert into auth.users(id,email,raw_user_meta_data) values(gen_random_uuid(),'uninvited@example.test','{\"name\":\"Uninvited\",\"organization_name\":\"Aliado\",\"requested_role\":\"fulfillment_partner\"}')"),/invitación del administrador maestro/);
+ const invitation=await asUser(db,'admin',async()=>(await db.query("select public.create_invitation($1,'invited-partner@example.test','Aliado','fulfillment_partner') value",[ids.org])).rows[0].value);
+ const user='90000000-0000-4000-8000-000000000017';
+ await db.query('insert into auth.users(id,email,raw_user_meta_data,email_confirmed_at) values($1,$2,$3,now())',[user,'invited-partner@example.test',JSON.stringify({name:'Aliado',organization_name:'Aliado',requested_role:'fulfillment_partner',invitation_token:invitation.token})]);
+ assert.equal((await db.query('select count(*) n from public.memberships where user_id=$1',[user])).rows[0].n,0);
+ const request=(await db.query('select id from public.access_requests where user_id=$1',[user])).rows[0].id;
+ await asUser(db,'admin',()=>db.query("select public.review_access($1,'aprobar')",[request]));
+ await asUser(db,user,async()=>{assert.equal(await count(db,'organizations'),1);assert.equal(await count(db,'fulfillment_nodes'),1);});
  }finally{await db.close();}
 });
 

@@ -18,6 +18,11 @@ function authError(error){
 export async function authenticate(action,fields={}) {
  const client=await supabase();
  if(action==='login'){const {error}=await client.auth.signInWithPassword({email:fields.email,password:fields.password});authError(error);return {ok:true};}
+ if(action==='register-owner'){
+  const {error}=await client.auth.signUp({email:fields.email,password:fields.password,options:{emailRedirectTo:location.origin+'/?auth=confirmed#ingresar',data:{name:fields.name}}});
+  authError(error);await client.auth.signOut({scope:'local'});
+  return {message:'Verifica tu correo para activar la administración maestra de Surtiva. Este acceso está reservado a la cuenta del propietario; no crea una cuenta de distribuidor.'};
+ }
  if(action==='register'){
   if(!['distributor_admin','seller','merchant','fulfillment_partner'].includes(fields.role))throw Error('Selecciona un perfil válido.');
   const {error}=await client.auth.signUp({email:fields.email,password:fields.password,options:{emailRedirectTo:location.origin+'/?auth=confirmed#ingresar',data:{name:fields.name,organization_name:fields.organization,requested_role:fields.role,...(fields.invitationToken?{invitation_token:fields.invitationToken}:{})}}});

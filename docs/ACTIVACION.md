@@ -7,7 +7,7 @@
 - Producción: https://surtiva-o3hj.vercel.app
 - Supabase: surtiva-production, referencia yirefmallnkgbckrbvrw.
 
-El proyecto Supabase se inspeccionó vacío mediante MCP. Las migraciones 001–014 definen el modelo activo. No repetir archivos ya registrados: las siguientes modificaciones requieren otra migración. OAuth tiene lectura de organizaciones/proyectos y lectura/escritura de base de datos, esta última aprobada expresamente por el propietario.
+El proyecto Supabase se inspeccionó vacío mediante MCP. Las migraciones 001–015 definen el modelo activo. No repetir archivos ya registrados: las siguientes modificaciones requieren otra migración. OAuth tiene lectura de organizaciones/proyectos y lectura/escritura de base de datos, esta última aprobada expresamente por el propietario.
 
 ## Arquitectura activa
 
@@ -23,7 +23,7 @@ Vercel Production y Preview usan SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY. /api/c
 
 El propietario confirmó Site URL https://surtiva-o3hj.vercel.app y Redirect URLs https://surtiva-o3hj.vercel.app/** y http://localhost:3000/**.
 
-La cuenta del Administrador maestro elegida es lexrodriguezorg@mail.com. Se activa desde https://surtiva-o3hj.vercel.app/#activar-administrador, con nombre, correo y contraseña, sin seleccionar organización ni perfil comercial. Un mecanismo privado de un solo uso activa surtiva_admin en la organización Surtiva al confirmar esa dirección. No confía en roles de metadatos ni concede acceso sin verificación. Otro correo no puede obtener autoridad global utilizando ese formulario.
+La cuenta del Administrador maestro elegida es lexrodriguezorg@gmail.com. Se activa desde https://surtiva-o3hj.vercel.app/#activar-administrador, con nombre, correo y contraseña, sin seleccionar organización ni perfil comercial. Un mecanismo privado de un solo uso activa surtiva_admin en la organización Surtiva al confirmar esa dirección. No confía en roles de metadatos ni concede acceso sin verificación. Otro correo no puede obtener autoridad global utilizando ese formulario.
 
 El propietario administra todas las organizaciones y sus operaciones. Daniela corresponde al perfil de distribuidora; no se creó una cuenta a su nombre sin conocer su correo. Aliados no se ofrece en la portada ni como alta pública. Su estructura se conserva para cuando el propietario decida usarla; solo el Administrador maestro puede crear una invitación de aliado y aprobarla. Los distribuidores pueden invitar vendedores y comercios.
 
@@ -57,4 +57,8 @@ Supabase confirmó cero tablas públicas sin RLS. Los avisos SECURITY DEFINER so
 
 Cada bloque se compila, prueba y publica primero en Preview. Verificar health, login, RLS y rechazo anónimo antes de actualizar main. Ante una incidencia mantener la portada y acceso cerrado; nunca restaurar el selector de perfiles de la demo. Respaldar datos antes de nuevas migraciones. No hay pagos ni integraciones comerciales externas.
 
-El 16 de septiembre de 2026 se publicó la versión 0.9.0 en la URL de producción verificada. La revisión del Administrador maestro pasó 18 pruebas automatizadas y build/check. La prueba remota bilateral con Auth real pasó en producción; Vercel confirmó Ready y no devolvió errores de ejecución en la consulta del despliegue. La activación personal del administrador y la entrega real de correo quedan pendientes de la verificación del propietario; guardar las URLs de redirección no demuestra entrega SMTP.
+El 16 de septiembre de 2026 se publicó la versión 0.9.0 en la URL de producción verificada. La revisión de verificación de correo pasó 21 pruebas automatizadas y build/check. La prueba remota bilateral con Auth real pasó en producción; Vercel confirmó Ready y no devolvió errores de ejecución en la consulta del despliegue. La cuenta lexrodriguezorg@gmail.com quedó verificada y activa como surtiva_admin en Surtiva. El propietario confirmó expresamente sustituir la dirección @mail.com por @gmail.com; la migración 015 activó únicamente la cuenta ya verificada. La entrega observada a este correo no valida el envío general a todas las direcciones; revisar SMTP antes de abrir altas comerciales.
+
+## Enlaces de verificación
+
+El registro conserva el verificador PKCE hasta completar el enlace. El retorno de Auth se procesa al cargar la página y después elimina el código de la URL. Los enlaces inválidos muestran un mensaje y acceso a #confirmar-correo para reenviar la confirmación. Si el correo ya está confirmado, ingresar con contraseña; no volver a registrar la cuenta. La prueba del cliente usa el SDK real contra respuestas simuladas y comprueba criptográficamente que registro y reenvío conservan el verificador correspondiente.

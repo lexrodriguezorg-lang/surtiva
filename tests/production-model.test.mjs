@@ -2,13 +2,28 @@ import test from 'node:test';
 import {database,fixture,migrate,asUser,ids,assert,count} from './database.mjs';
 import {pilotSeed} from '../scripts/migrate-pilot.mjs';
 
+test('master email correction activates an existing verified account without confirming other users',async()=>{
+ const db=await database(14);try{
+ await db.query('insert into auth.users(id,email,raw_user_meta_data,email_confirmed_at) values($1,$2,$3,now())',[ids.admin,'lexrodriguezorg@gmail.com',JSON.stringify({name:'Propietario',organization_name:'Surtiva',requested_role:'distributor_admin'})]);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.pending,'pending@example.test',JSON.stringify({name:'Pending'})]);
+ assert.equal(await count(db,'memberships'),0);
+ await migrate(db,14);
+ const member=(await db.query('select user_id,role_id from public.memberships')).rows;
+ assert.deepEqual(member,[{user_id:ids.admin,role_id:'surtiva_admin'}]);
+ assert.equal((await db.query('select email_confirmed_at from auth.users where id=$1',[ids.pending])).rows[0].email_confirmed_at,null);
+ assert.equal((await db.query('select status from public.access_requests where user_id=$1',[ids.admin])).rows[0].status,'active');
+ }finally{await db.close();}
+});
+
 test('pilot import contains catalog only and bootstrap grants global access only after email verification',async()=>{
  const db=await database(999);try{
  const {sql}=await pilotSeed();await db.exec(sql);await db.exec(sql);
  assert.equal(await count(db,'products'),1072);assert.equal(await count(db,'distributor_products'),1072);
  assert.equal(await count(db,'orders'),0);assert.equal(await count(db,'clients'),0);assert.equal(await count(db,'sellers'),0);
  assert.equal((await db.query('select count(*) n from public.inventory where quantity is not null or reserved<>0')).rows[0].n,0);
- await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.admin,'lexrodriguezorg@mail.com',JSON.stringify({name:'Administrador maestro'})]);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data,email_confirmed_at) values($1,$2,$3,now())',[ids.pending,'lexrodriguezorg@mail.com',JSON.stringify({name:'Old address'})]);
+ assert.equal(await count(db,'memberships'),0);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.admin,'lexrodriguezorg@gmail.com',JSON.stringify({name:'Administrador maestro'})]);
  assert.equal(await count(db,'memberships'),0);
  assert.equal(await count(db,'access_requests'),0);
  await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.admin]);

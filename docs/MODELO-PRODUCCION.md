@@ -16,7 +16,7 @@ Los pedidos, facturas y despachos se comparten solo con sus participantes. El di
 
 El navegador utiliza Supabase JS, Publishable key y Auth. La API verifica el JWT con Supabase y consulta con ese mismo JWT; RLS sigue vigente. No se entrega una service/secret key al navegador. Las mutaciones comerciales y aprobaciones son funciones transaccionales que comprueban permisos en PostgreSQL.
 
-El registro comercial crea perfil y solicitud pendiente, sin organización ni membresía. La aprobación requiere correo verificado. Las invitaciones se muestran como enlaces para compartir; no se afirma que se haya enviado un correo. La cuenta maestra `lexrodriguezorg@mail.com` tiene activación propia, sin rol comercial, vinculada únicamente tras verificar su identidad. El Administrador maestro puede administrar toda la red; Dukes conserva su propia organización distribuidora. Las alianzas se crean exclusivamente desde la administración maestra y no se ofrecen como alta pública.
+El registro comercial crea perfil y solicitud pendiente, sin organización ni membresía. La aprobación requiere correo verificado. Las invitaciones se muestran como enlaces para compartir; no se afirma que se haya enviado un correo. La cuenta maestra `lexrodriguezorg@gmail.com` tiene activación propia, sin rol comercial, vinculada únicamente tras verificar su identidad. El Administrador maestro puede administrar toda la red; Dukes conserva su propia organización distribuidora. Las alianzas se crean exclusivamente desde la administración maestra y no se ofrecen como alta pública.
 
 ## Datos y comprobación
 

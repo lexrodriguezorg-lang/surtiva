@@ -1,3 +1,5 @@
+import {createReadCache} from './request-cache.js';
+const reads=createReadCache();
 import {authenticate,accessToken,supabase} from './auth.js';
 import {readAuthReturn,authMessage,cleanAuthReturn} from './auth-return.js';
 import {landingMarkup,dashboardMarkup,catalogMarkup,scanMarkup,crmMarkup,icons} from './workspace-ui.js';
@@ -27,14 +29,21 @@ const currentOrg=()=>session?.organizations.find(o=>o.id===organization);
 const role=()=>reviewState?.role||(session?.isAdmin?'admin':membership()?.role_id);
 const can=permission=>!permission||(!reviewing()&&session?.isAdmin)||session?.permissions.some(p=>p.role_id===role()&&p.permission_id===permission);
 function notify(message){const box=document.querySelector('#toast');box.textContent=message;box.classList.add('show');setTimeout(()=>box.classList.remove('show'),5000);}
-async function api(path,{method='GET',body,retry=true}={}) {
+async function api(path,options={}) {
+ const method=options.method||'GET';
+ if(method!=='GET'||path.startsWith('auth/')){reads.clear();return request(path,options);}
+ const token=await accessToken();
+ try{return await reads.read((token||'anonymous')+':'+path,()=>request(path,options));}
+ catch(error){if([401,403].includes(error.status)){reads.clear();if(error.status===401)session=null;}throw error;}
+}
+async function request(path,{method='GET',body,retry=true}={}) {
  if(reviewing()&&method!=='GET'&&!path.startsWith('auth/'))throw Error('Estás revisando un perfil. Vuelve a Surtiva para hacer cambios.');
  if(path.startsWith('auth/'))return authenticate(path.slice(5),body);
  const token=['config','health'].includes(path)?null:await accessToken();
  if(!token&&!['config','health'].includes(path)){const error=Error('Ingresa para continuar.');error.status=401;throw error;}
- const response=await fetch('/api/'+path,{method,credentials:'same-origin',cache:'no-store',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(method==='GET'?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
+ const response=await fetch('/api/'+path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:{...(token?{Authorization:'Bearer '+token}:{}),...(method==='GET'?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
  if(response.status===401&&retry&&!path.startsWith('auth/')) {
-  try {refreshing ||= api('auth/refresh',{method:'POST',body:{},retry:false}).finally(()=>refreshing=null);await refreshing;return api(path,{method,body,retry:false});}
+  try {refreshing ||= api('auth/refresh',{method:'POST',body:{},retry:false}).finally(()=>refreshing=null);await refreshing;return request(path,{method,body,retry:false});}
   catch {session=null;organization='';cart=[];}
  }
  const result=await response.json().catch(()=>({error:'No se pudo contactar el servicio.'}));
@@ -49,15 +58,15 @@ const data=(table,extra='')=>{
  return ownerMode()?api('admin/data/'+table+extra):api(scoped('data/'+table+extra));
 };
 async function allData(table){const result=[],size=ownerMode()?500:100;for(let start=0;;start+=size){const page=await data(table,'?offset='+start+'&limit='+size);result.push(...page);if(page.length<size)break;if(start>=100000)throw Error('Demasiados registros para esta vista.');}return result;}
-function header(){return `<header class="public-header"><a href="#portada" aria-label="Surtiva, inicio">${brand}</a><nav aria-label="Acceso"><a class="btn light" href="#solicitar">Solicitar acceso</a><a class="btn primary" href="#ingresar">Ingresar</a></nav></header>`;}
-function landing(){return landingMarkup(header());}
+function header(showRequest=true){return `<header class="public-header"><a href="#portada" aria-label="Surtiva, inicio">${brand}</a><nav aria-label="Acceso">${showRequest?'<a class="btn light" href="#solicitar">Solicitar acceso</a>':''}<a class="btn primary" href="#ingresar">Ingresar ↗</a></nav></header>`;}
+function landing(){return landingMarkup(header(false));}
 function authPage(register=false){return header()+`<main id="contenido" class="auth-page"><section class="auth-intro"><span class="mk-eyebrow">TU PRÓXIMO PASO</span><h1>${register?'Conectemos<br>tu negocio.':'Bienvenido<br>a tu red.'}</h1><p>${register?'Cuéntanos quién eres y cómo participas. Revisaremos tu solicitud antes de habilitar tu espacio de trabajo.':'Ingresa con tu cuenta aprobada para acceder a la información de tu organización.'}</p></section><section class="auth-form"><h2>${register?'Solicitar acceso':'Ingresar'}</h2><form id="${register?'register':'login'}">${register?'<label class="field">Nombre completo<input name="name" autocomplete="name" maxlength="100" required></label><label class="field">Organización o negocio<input name="organization" autocomplete="organization" maxlength="120" required></label><label class="field">Perfil solicitado<select name="role" required><option value="">Selecciona tu perfil</option>'+Object.entries(roles).filter(([value])=>value!=='fulfillment_partner'||(inviteToken()&&new URLSearchParams(location.search).get('profile')===value)).map(([value,label])=>`<option value="${value}" ${new URLSearchParams(location.search).get('profile')===value?'selected':''}>${label}</option>`).join('')+'</select></label>':''}<label class="field">Correo electrónico<input type="email" name="email" autocomplete="email" maxlength="254" required></label><label class="field">Contraseña<input type="password" name="password" autocomplete="${register?'new-password':'current-password'}" ${register?'minlength="12"':''} maxlength="128" required></label>${register?'<small>Usa al menos 12 caracteres. Recibirás un correo para verificar tu dirección. Tu acceso necesita aprobación.</small>':''}<div class="form-feedback" role="status" aria-live="polite">${authNotice?`<p class="form-message">${esc(authNotice)}</p>`:''}</div><button class="btn primary" type="submit">${register?'Enviar solicitud':'Ingresar'}</button><a class="secondary-link" href="#${register?'ingresar':'solicitar'}">${register?'Ya tengo una cuenta':'Solicitar una cuenta'}</a>${register?'':'<a class="secondary-link" href="#recuperar">Olvidé mi contraseña</a><a class="secondary-link" href="#confirmar-correo">Reenviar confirmación de correo</a>'}</form></section></main>`;}
 function pending(){if(session?.accountStatus==='suspended')return header()+'<main id="contenido" class="pending"><span class="pill orange">Acceso suspendido</span><h1>Tu organización o membresía está suspendida.</h1><p>Contacta a la administración de Surtiva para revisar el estado de tu acceso.</p><button class="btn light" data-action="logout">Cerrar sesión</button><button class="btn primary" data-action="refresh-session">Consultar estado</button></main>';const rejected=session?.accountStatus==='rejected'||session?.request?.status==='rejected';return `<header class="public-header"><a href="#portada">${brand}</a><button class="btn light" data-action="logout">Cerrar sesión</button></header><main id="contenido" class="pending"><span class="pill orange">${rejected?'Solicitud revisada':'Acceso pendiente'}</span><h1>${rejected?'Tu solicitud no fue aprobada.':'Tu solicitud está en revisión.'}</h1><p>${rejected?'Por ahora tu cuenta no tiene acceso a una organización.':'La verificación de correo y la aprobación de Surtiva son necesarias para habilitar tu espacio.'}</p><button class="btn primary" data-action="refresh-session">Consultar estado</button></main>`;}
 function shell(content,page){
  const owner=ownerMode(),review=reviewing();
  const ownerSections=[['red','Mi gestión'],['catalogo','Catálogo central'],['pedidos','Control de ventas'],['radar','Radar de clientes'],['prospeccion','Prospección'],['clientes','Clientes y comercios'],['vendedores','Equipo de ventas'],['agentes','Agentes y responsables'],['seguimiento','Seguimientos'],['cartera','Cartera'],['proveedores','Proveedores'],['inventario','Inventarios'],['organizaciones','Organizaciones'],['solicitudes','Solicitudes'],['usuarios','Usuarios'],['perfiles','Revisar perfiles']];
  const nav=owner?ownerSections:sections.filter(x=>can(x[2])).map(([id,label])=>[id,label]);
- return '<div class="shell restored-shell"><aside class="sidebar" id="workspace-sidebar"><a class="logo" href="#'+(session.isAdmin?'red':'inicio')+'" '+(session.isAdmin?'data-action="owner-home"':'')+'>'+brand+'</a><div class="workspace">'+(owner?'<span class="owner-badge">ADMINISTRADOR MAESTRO</span><strong>Tu centro de gestión</strong><small>Toda la red Surtiva</small>':review?'<span class="owner-badge">REVISIÓN DE PERFIL</span><strong>'+esc(roles[role()])+'</strong><small>'+esc(orgName(organization))+'</small>':'<strong>'+esc(roles[role()]||'Administración')+'</strong><small>'+esc(currentOrg()?.name)+'</small>'+(session.organizations.length>1?'<label class="scope-label" for="organization">Tu espacio</label><select id="organization" class="tenant-select">'+session.organizations.map(o=>'<option value="'+o.id+'" '+(o.id===organization?'selected':'')+'>'+esc(o.name)+'</option>').join('')+'</select>':''))+'</div><nav class="navlist workspace-nav" aria-label="Área comercial">'+nav.map(([id,label])=>'<a class="navitem '+(page===id?'active':'')+'" href="#'+id+'"><span aria-hidden="true">'+(icons[id]||'·')+'</span>'+label+'</a>').join('')+'</nav><div class="sidebarfooter">'+(session.isAdmin&&!owner?'<button class="btn light full" data-action="owner-home">← Volver a mi gestión</button>':'')+'<p class="platform-profile">'+esc(session.user.name)+'<br>'+esc(session.user.email)+'</p><button class="btn light full" data-action="logout">Cerrar sesión</button></div></aside><main class="main" id="contenido"><header class="topbar"><button class="btn light mobile-toggle" data-action="menu" aria-label="Abrir menú" aria-expanded="false" aria-controls="workspace-sidebar">☰</button><strong>'+(owner?'SURTIVA / Mi gestión':esc(orgName(organization)))+'</strong><div class="topbar-actions">'+(owner?'<a href="#perfiles" class="btn light small">Revisar perfiles</a>':'')+'<span class="pill">'+(owner?'Vista global':esc(roles[role()]||'Administrador maestro'))+'</span></div></header>'+(review?'<div class="review-banner"><strong>Revisión · '+esc(roles[role()])+'</strong><span>'+(reviewState.member?'Datos y permisos del usuario seleccionado. Solo lectura.':reviewState.organization?'Datos reales de la organización. Revisión de distribuidor en solo lectura.':'Vista sin usuario asignado: muestra el estado vacío real de este perfil.')+'</span><button class="btn light small" data-action="owner-home">Salir de revisión</button></div>':'')+'<div class="content">'+content+'</div></main></div>';
+ return '<div class="shell restored-shell"><button class="menu-scrim" data-action="close-menu" aria-label="Cerrar menú" tabindex="-1"></button><aside class="sidebar" id="workspace-sidebar"><button class="menu-close" data-action="close-menu" aria-label="Cerrar menú">✕</button><a class="logo" href="#'+(session.isAdmin?'red':'inicio')+'" '+(session.isAdmin?'data-action="owner-home"':'')+'>'+brand+'</a><div class="workspace">'+(owner?'<span class="owner-badge">ADMINISTRADOR MAESTRO</span><strong>Tu centro de gestión</strong><small>Toda la red Surtiva</small>':review?'<span class="owner-badge">REVISIÓN DE PERFIL</span><strong>'+esc(roles[role()])+'</strong><small>'+esc(orgName(organization))+'</small>':'<strong>'+esc(roles[role()]||'Administración')+'</strong><small>'+esc(currentOrg()?.name)+'</small>'+(session.organizations.length>1?'<label class="scope-label" for="organization">Tu espacio</label><select id="organization" class="tenant-select">'+session.organizations.map(o=>'<option value="'+o.id+'" '+(o.id===organization?'selected':'')+'>'+esc(o.name)+'</option>').join('')+'</select>':''))+'</div><nav class="navlist workspace-nav" aria-label="Área comercial">'+nav.map(([id,label])=>'<a class="navitem '+(page===id?'active':'')+'" href="#'+id+'"><span aria-hidden="true">'+(icons[id]||'·')+'</span>'+label+'</a>').join('')+'</nav><div class="sidebarfooter">'+(session.isAdmin&&!owner?'<button class="btn light full" data-action="owner-home">← Volver a mi gestión</button>':'')+'<p class="platform-profile">'+esc(session.user.name)+'<br>'+esc(session.user.email)+'</p><button class="btn light full" data-action="logout">Cerrar sesión</button></div></aside><main class="main" id="contenido"><header class="topbar"><button class="btn light mobile-toggle" data-action="menu" aria-label="Abrir menú" aria-expanded="false" aria-controls="workspace-sidebar">☰</button><strong>'+(owner?'SURTIVA / Mi gestión':esc(orgName(organization)))+'</strong><div class="topbar-actions">'+(owner?'<a href="#perfiles" class="btn light small">Revisar perfiles</a>':'')+'<span class="pill">'+(owner?'Vista global':esc(roles[role()]||'Administrador maestro'))+'</span></div></header>'+(review?'<div class="review-banner"><strong>Revisión · '+esc(roles[role()])+'</strong><span>'+(reviewState.member?'Datos y permisos del usuario seleccionado. Solo lectura.':reviewState.organization?'Datos reales de la organización. Revisión de distribuidor en solo lectura.':'Vista sin usuario asignado: muestra el estado vacío real de este perfil.')+'</span><button class="btn light small" data-action="owner-home">Salir de revisión</button></div>':'')+'<div class="content">'+content+'</div></main></div>';
 }
 const title=(heading,subtitle='')=>`<h1 class="section-title">${heading}</h1>${subtitle?`<p class="scope-note">${subtitle}</p>`:''}`;
 async function dashboard(){
@@ -102,14 +111,19 @@ async function enrich(page,list){
  return list;
 }
 async function render(){
- const version=++renderVersion,page=route();modal.close();
+ const version=++renderVersion,page=route();modal.close();setMenu(false);
  if(page==='confirmar-correo'){app.innerHTML=confirmationPage();checkConfiguration(version);return;}
  if(page==='activar-administrador'){app.innerHTML=ownerActivationPage();checkConfiguration(version);return;}
  if(page==='verificar-recuperacion'){app.innerHTML=recoveryCodePage();checkConfiguration(version);return;}
  if(['recuperar','nueva-clave'].includes(page)){app.innerHTML=recoveryPage(page==='nueva-clave');checkConfiguration(version);return;}
  if(page==='portada'){app.innerHTML=landing();return;}
  if(['ingresar','acceso','solicitar'].includes(page)){app.innerHTML=authPage(page==='solicitar');checkConfiguration(version);return;}
- app.innerHTML='<div class="boot"><b>surtiva<span>✳</span></b><p>Verificando acceso…</p></div>';
+ if(session){
+  const area=app.querySelector('.content');
+  const loading='<div class="route-loading" role="status"><span></span>Cargando sección…</div>';
+  if(area){area.innerHTML=loading;app.querySelectorAll('.navitem').forEach(a=>a.classList.toggle('active',a.hash==='#'+page));}
+  else app.innerHTML=shell(loading,page);
+ }else app.innerHTML='<div class="boot"><b>surtiva<span>✳</span></b><p>Abriendo tu espacio…</p></div>';
  try {
   session=await api('session');if(version!==renderVersion)return;
   if(!session.isAdmin&&!session.memberships.length){app.innerHTML=pending();return;}
@@ -133,7 +147,7 @@ async function render(){
    content+=managementTools(page);
   } else content=title('Sección no disponible.','Tu cuenta no tiene permiso para acceder a esta sección.')+'<a class="btn primary" href="#inicio">Volver a mi espacio</a>';
   if(version===renderVersion)app.innerHTML=shell(content,page);
- } catch(error){if(version!==renderVersion)return;if(error.status===401){session=null;app.innerHTML=authPage(false);checkConfiguration(version);}else app.innerHTML=header()+`<main id="contenido" class="pending"><h1>No pudimos cargar tu espacio.</h1><p>${esc(error.message)}</p><button class="btn primary" data-action="refresh-session">Intentar nuevamente</button></main>`;}
+ } catch(error){if(version!==renderVersion)return;if(error.status===401){session=null;app.innerHTML=authPage(false);checkConfiguration(version);}else {const message='<div class="empty-state"><h2>No pudimos cargar esta sección.</h2><p>'+esc(error.name==='TimeoutError'?'La conexión tardó demasiado. Puedes seguir navegando o volver a intentar.':error.message)+'</p><button class="btn primary" data-action="refresh-session">Reintentar</button></div>';app.innerHTML=session?shell(message,page):header()+message;}}
 }
 async function checkConfiguration(version){try{const health=await api('health');if(version!==renderVersion||health.configured)return;const form=app.querySelector('.auth-form form');if(form){form.querySelector('.form-feedback').innerHTML='<p class="form-message">Estamos habilitando el acceso a Surtiva. El registro y el ingreso todavía no están disponibles.</p>';form.querySelector('button[type="submit"]').disabled=true;}}catch{/* The server still fails closed if configuration cannot be checked. */}}
 function dialog(titleText,body){modal.innerHTML=`<div class="dialoghead"><h2>${esc(titleText)}</h2><button class="btn light small" data-action="close" aria-label="Cerrar">✕</button></div><div class="dialogbody">${body}<div class="form-feedback" role="status" aria-live="polite"></div></div>`;modal.showModal();}
@@ -200,7 +214,7 @@ async function reviewDialog(id){const request=rows.find(r=>r.id===id);dialog('Re
 document.addEventListener('click',async event=>{
  if(event.target.closest('[href="#contenido"]')){event.preventDefault();const main=document.querySelector('#contenido');main?.setAttribute('tabindex','-1');main?.focus();return;}
  const button=event.target.closest('[data-action]');if(!button)return;const {action,id}=button.dataset;button.disabled=true;
- if(reviewing()&&!['owner-home','logout','menu','close','previous','next','product-detail','catalog-more','order'].includes(action)){notify('Vista de revisión: vuelve a tu gestión para hacer cambios.');button.disabled=false;return;}
+ if(reviewing()&&!['owner-home','logout','menu','close-menu','close','previous','next','product-detail','catalog-more','order'].includes(action)){notify('Vista de revisión: vuelve a tu gestión para hacer cambios.');button.disabled=false;return;}
  if(ownerMode()){const row=rows.find(r=>r.id===id||r.product_id===id);if(row?.organization_id)organization=row.organization_id;}
  try {
   if(action==='logout'){workspaceMode=false;reviewState=null;await api('auth/logout',{method:'POST',body:{}});session=null;organization='';cart=[];rows=[];location.hash='portada';await render();}
@@ -212,8 +226,9 @@ document.addEventListener('click',async event=>{
   if(action==='prospect-new'||action==='prospect-edit')await prospectDialog(id);
   if(action==='agent-new')agentDialog();
   if(action==='radar-followup'){const client=radarClients.find(c=>c.id===id);rows=[client];organization=client.organization_id;if(!client.seller_id){await assignSellerDialog(client);return;}dialog('Seguimiento · '+client.name,'<form id="followup" data-id="'+client.id+'" data-seller="'+client.seller_id+'"><label>Nota<textarea name="note" maxlength="2000" required></textarea></label><label>Próximo contacto<input name="nextDate" type="date" required></label><button class="btn primary">Guardar seguimiento</button></form>');}
-  if(action==='refresh-session')await render();
-  if(action==='menu'){const open=document.querySelector('.shell').classList.toggle('mobile-open');button.setAttribute('aria-expanded',String(open));}
+  if(action==='refresh-session'){reads.clear();await render();}
+  if(action==='menu')setMenu(!document.querySelector('.shell')?.classList.contains('mobile-open'));
+  if(action==='close-menu')setMenu(false,true);
   if(action==='close')modal.close();
   if(action==='next'||action==='previous'){offset=Math.max(0,offset+(action==='next'?100:-100));await render();}
   if(action==='select-org'){workspaceMode=true;reviewState=null;organization=id;cart=[];offset=0;location.hash='inicio';}
@@ -272,7 +287,22 @@ document.addEventListener('change',event=>{
  if(event.target.id==='organization'){organization=event.target.value;cart=[];rows=[];offset=0;orderRequestKey=crypto.randomUUID();render();}
  if(event.target.closest('#review-access')&&['organizationId','role'].includes(event.target.name))approvalEntities().catch(error=>notify(error.message));
 });
-document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelector('.shell')?.classList.remove('mobile-open');});
+function setMenu(open,restore=false){
+ const shell=app.querySelector('.shell');if(!shell)return;
+ shell.classList.toggle('mobile-open',open);document.body.classList.toggle('menu-is-open',open);
+ shell.querySelector('.mobile-toggle')?.setAttribute('aria-expanded',String(open));
+ if(open)shell.querySelector('.menu-close')?.focus();else if(restore)shell.querySelector('.mobile-toggle')?.focus();
+}
+document.addEventListener('click',event=>{if(event.target.closest('.sidebar a[href]'))setMenu(false);},true);
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape')setMenu(false,true);
+ if(event.key==='Tab'&&document.body.classList.contains('menu-is-open')){
+  const nodes=[...document.querySelectorAll('.sidebar a,.sidebar button,.sidebar select')].filter(el=>el.getClientRects().length&&!el.disabled);
+  const first=nodes[0],last=nodes.at(-1);
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+ }
+});
 document.addEventListener('input',event=>{if(event.target.id==='catalog-query'){catalogFilters.query=event.target.value;catalogFilters.limit=36;refreshCatalog();return;}if(event.target.id==='search'){const query=event.target.value.toLocaleLowerCase('es');document.querySelector('#data-list').innerHTML=tableView(route(),rows.filter(r=>Object.values(r).some(v=>String(v).toLocaleLowerCase('es').includes(query))));}});
 window.addEventListener('hashchange',()=>{authNotice='';offset=0;render();window.scrollTo(0,0);});
 window.addEventListener('pageshow',event=>{if(event.persisted)render();});

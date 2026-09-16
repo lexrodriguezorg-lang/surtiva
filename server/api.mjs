@@ -85,7 +85,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    if(path==='session'&&req.method==='GET')return reply(200,ctx);
    if(path==='admin/requests'&&req.method==='GET') {
     if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
-    return reply(200,await service.db('access_requests?select=*,profiles(name)&order=created_at.desc',{token}));
+    return reply(200,await service.db('access_requests?select=*,profiles!access_requests_user_id_fkey(name)&order=created_at.desc',{token}));
    }
    if(path==='admin/review'&&req.method==='POST') {
     if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
@@ -100,6 +100,28 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    const membership=ctx.memberships.find(m=>m.organization_id===org);
    if(!ctx.organizations.some(o=>o.id===org)||(!ctx.isAdmin&&!membership))throw new HttpError(403,'No tienes acceso a esta organización.');
    const can=permission=>ctx.isAdmin||ctx.permissions.some(p=>p.role_id===membership.role_id&&p.permission_id===permission);
+   if(path==='entities'&&req.method==='POST') {
+    if(!ctx.isAdmin&&membership.role_id!=='distribuidor')throw new HttpError(403,'No autorizado.');
+    const id=await service.db('rpc/create_entity',{token,method:'POST',body:{org,kind:body.kind,payload:body.payload}});return reply(201,{id});
+   }
+   if(path==='catalog/access'&&req.method==='POST') {
+    if((!ctx.isAdmin&&membership.role_id!=='distribuidor')||typeof body.enabled!=='boolean')throw new HttpError(403,'No autorizado.');
+    await service.db('rpc/set_catalog_access',{token,method:'POST',body:{org,product_key:validId(body.productId),entity_kind:body.entityKind,entity_key:validId(body.entityId),enabled:body.enabled}});return reply(200,{ok:true});
+   }
+   if(path==='orders/assign'&&req.method==='POST') {
+    if(!ctx.isAdmin&&membership.role_id!=='distribuidor')throw new HttpError(403,'No autorizado.');
+    await service.db('rpc/assign_fulfillment',{token,method:'POST',body:{org,order_key:validId(body.id),point_key:validId(body.pointId)}});return reply(200,{ok:true});
+   }
+   if(path==='retail'&&req.method==='PATCH') {
+    if(!can('retail.manage')||!Number.isInteger(body.quantity)||body.quantity<0||!Number.isFinite(body.price)||body.price<=0)throw new HttpError(400,'Datos o permiso inválido.');
+    const customerId=validId(membership?.customer_id||body.customerId);
+    const changed=await service.db('retail_inventory?organization_id=eq.'+org+'&customer_id=eq.'+customerId+'&product_id=eq.'+validId(body.productId),{token,method:'PATCH',headers:{Prefer:'return=representation'},body:{quantity:body.quantity,price:body.price}});
+    if(!changed.length)throw new HttpError(404,'Producto no encontrado.');return reply(200,{ok:true});
+   }
+   if(path==='retail/sale'&&req.method==='POST') {
+    if(!can('retail.manage'))throw new HttpError(403,'No autorizado.');
+    const id=await service.db('rpc/record_local_sale',{token,method:'POST',body:{org,customer_key:validId(membership?.customer_id||body.customerId),items:body.items,sale_key:validId(body.requestKey)}});return reply(201,{id});
+   }
    if(path.startsWith('data/')&&req.method==='GET') {
     const table=path.slice(5),permission=resources[table];
     if(!permission||!can(permission))throw new HttpError(403,'No tienes permiso para consultar esta sección.');

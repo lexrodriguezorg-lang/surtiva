@@ -50,7 +50,8 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
   res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('Vary','Cookie');res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('X-Content-Type-Options','nosniff');
   const reply=(status,data)=>{res.statusCode=status;res.end(JSON.stringify(data));};
   try {
-   const url=new URL(req.url,'http://localhost'),path=url.pathname.replace(/^\/api\/?/,'');
+   const url=new URL(req.url,'http://localhost');
+   const path=['/api','/api/','/api/index'].includes(url.pathname)?(url.searchParams.get('_route')||''):url.pathname.replace(/^\/api\/?/,'');
    if(!['GET','POST','PATCH'].includes(req.method))throw new HttpError(405,'Método no permitido.');
    let body={}; if(req.method!=='GET'){originCheck(req,env);body=await readBody(req);if(!body||Array.isArray(body)||typeof body!=='object')throw new HttpError(400,'Solicitud inválida.');}
    const secure=secureRequest(env), prefix=secure?'__Host-surtiva-':'surtiva-';

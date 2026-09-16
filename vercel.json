@@ -3,6 +3,7 @@
   "framework": null,
   "buildCommand": "npm run build && npm run check",
   "outputDirectory": "dist",
+  "rewrites": [{"source":"/api/:path*","destination":"/api?_route=:path*"}],
   "headers": [
     {"source":"/(.*)","headers":[
       {"key":"X-Content-Type-Options","value":"nosniff"},

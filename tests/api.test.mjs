@@ -37,3 +37,10 @@ test('public registration rejects platform roles and never sets an authenticated
  assert.equal((await call(handler,req('auth/register','POST',form))).status,400);
  const ok=await call(handler,req('auth/register','POST',{...form,role:'comercio',isAdmin:true}));assert.equal(ok.status,202);assert.equal(ok.headers['Set-Cookie'],undefined);assert.equal(bodies[0].data.isAdmin,undefined);
 });
+test('Vercel rewrite preserves nested API routes and tenant query parameters',async()=>{
+ const handler=createHandler({env,fetcher:async()=>response({access_token:'access',refresh_token:'refresh',expires_in:3600})});
+ const login=req('auth/login','POST',{email:'a@example.test',password:'long-password'});login.url='/api?_route=auth%2Flogin';
+ assert.equal((await call(handler,login)).status,200);
+ const read=req('data/orders?organization='+ids.org);read.url='/api?_route=data%2Forders&organization='+ids.org;
+ assert.equal((await call(handler,read)).status,401);
+});

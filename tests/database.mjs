@@ -2,14 +2,19 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
-export async function database() {
+// Legacy regressions exercise the preserved demo migration; production-model
+// tests explicitly upgrade these fixtures through all subsequent migrations.
+export async function database(through=5) {
  const db = new PGlite();
  await db.exec(`create role anon; create role authenticated; create schema auth;
  create table auth.users(id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for(const file of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
+ await migrate(db,0,through);
  return db;
+}
+export async function migrate(db,after=5,through=999) {
+ for(const file of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')&&Number(f.split('_')[0])>after&&Number(f.split('_')[0])<=through).sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
 }
 export const ids = { admin:'00000000-0000-4000-8000-000000000001', owner:'00000000-0000-4000-8000-000000000002', seller:'00000000-0000-4000-8000-000000000003', shop:'00000000-0000-4000-8000-000000000004', partner:'00000000-0000-4000-8000-000000000005', pending:'00000000-0000-4000-8000-000000000006', other:'00000000-0000-4000-8000-000000000007', org:'10000000-0000-4000-8000-000000000001', org2:'10000000-0000-4000-8000-000000000002', seller1:'20000000-0000-4000-8000-000000000001', seller2:'20000000-0000-4000-8000-000000000002', customer:'30000000-0000-4000-8000-000000000001', customer2:'30000000-0000-4000-8000-000000000002', point:'40000000-0000-4000-8000-000000000001', product:'50000000-0000-4000-8000-000000000001', product2:'50000000-0000-4000-8000-000000000002', product3:'50000000-0000-4000-8000-000000000003', order:'60000000-0000-4000-8000-000000000001', order2:'60000000-0000-4000-8000-000000000002' };
 export async function fixture(db) {

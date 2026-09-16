@@ -146,7 +146,7 @@ async function render(){
    content=title(page==='usuarios'?'Usuarios y permisos.':sections.find(s=>s[0]===page)?.[1]+'.',page==='cumplimiento'?'Solo pedidos y movimientos de tus puntos asignados. Los pagos y conciliaciones son registros; no se procesan pagos.':page==='comisiones'?'Proyecciones según la política de tu organización. Sin procesamiento de pagos.':ownerMode()?'Datos de toda la red · cada registro conserva su organización.':'Información de '+esc(currentOrg()?.name)+'.')+`<div class="toolbar"><label>Buscar en esta página <input id="search" type="search" placeholder="Escribe para filtrar"></label>${page==='catalogo'&&can('orders.create')?`<button class="btn primary" data-action="cart">Revisar pedido (${cart.length})</button>`:''}</div><div id="data-list">${tableView(page,rows)}</div><div class="toolbar"><span class="data-summary">${rows.length} registros · Página ${offset/100+1}</span><div><button class="btn light small" data-action="previous" ${offset===0?'disabled':''}>Anterior</button> <button class="btn light small" data-action="next" ${raw.length<100?'disabled':''}>Siguiente</button></div></div>`;
    content+=managementTools(page);
   } else content=title('Sección no disponible.','Tu cuenta no tiene permiso para acceder a esta sección.')+'<a class="btn primary" href="#inicio">Volver a mi espacio</a>';
-  if(version===renderVersion)app.innerHTML=shell(content,page);
+  if(version===renderVersion){app.innerHTML=shell(content,page);setMenu(false);}
  } catch(error){if(version!==renderVersion)return;if(error.status===401){session=null;app.innerHTML=authPage(false);checkConfiguration(version);}else {const message='<div class="empty-state"><h2>No pudimos cargar esta sección.</h2><p>'+esc(error.name==='TimeoutError'?'La conexión tardó demasiado. Puedes seguir navegando o volver a intentar.':error.message)+'</p><button class="btn primary" data-action="refresh-session">Reintentar</button></div>';app.innerHTML=session?shell(message,page):header()+message;}}
 }
 async function checkConfiguration(version){try{const health=await api('health');if(version!==renderVersion||health.configured)return;const form=app.querySelector('.auth-form form');if(form){form.querySelector('.form-feedback').innerHTML='<p class="form-message">Estamos habilitando el acceso a Surtiva. El registro y el ingreso todavía no están disponibles.</p>';form.querySelector('button[type="submit"]').disabled=true;}}catch{/* The server still fails closed if configuration cannot be checked. */}}
@@ -290,10 +290,12 @@ document.addEventListener('change',event=>{
 function setMenu(open,restore=false){
  const shell=app.querySelector('.shell');if(!shell)return;
  shell.classList.toggle('mobile-open',open);document.body.classList.toggle('menu-is-open',open);
+ shell.querySelector('.sidebar').inert=matchMedia('(max-width:760px)').matches&&!open;
  shell.querySelector('.mobile-toggle')?.setAttribute('aria-expanded',String(open));
  if(open)shell.querySelector('.menu-close')?.focus();else if(restore)shell.querySelector('.mobile-toggle')?.focus();
 }
 document.addEventListener('click',event=>{if(event.target.closest('.sidebar a[href]'))setMenu(false);},true);
+matchMedia('(max-width:760px)').addEventListener('change',()=>setMenu(false));
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape')setMenu(false,true);
  if(event.key==='Tab'&&document.body.classList.contains('menu-is-open')){

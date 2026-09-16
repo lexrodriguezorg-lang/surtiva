@@ -1,5 +1,21 @@
 import test from 'node:test';
 import {database,fixture,migrate,asUser,ids,assert,count} from './database.mjs';
+import {pilotSeed} from '../scripts/migrate-pilot.mjs';
+
+test('pilot import contains catalog only and bootstrap grants global access only after email verification',async()=>{
+ const db=await database(999);try{
+ const {sql}=await pilotSeed();await db.exec(sql);await db.exec(sql);
+ assert.equal(await count(db,'products'),1072);assert.equal(await count(db,'distributor_products'),1072);
+ assert.equal(await count(db,'orders'),0);assert.equal(await count(db,'clients'),0);assert.equal(await count(db,'sellers'),0);
+ assert.equal((await db.query('select count(*) n from public.inventory where quantity is not null or reserved<>0')).rows[0].n,0);
+ await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[ids.admin,'lexrodriguezorg@mail.com',JSON.stringify({name:'Administrador Surtiva',organization_name:'Surtiva',requested_role:'distributor_admin'})]);
+ assert.equal(await count(db,'memberships'),0);
+ await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.admin]);
+ assert.equal((await db.query('select role_id from public.memberships')).rows[0].role_id,'surtiva_admin');
+ await db.query('update auth.users set email_confirmed_at=now() where id=$1',[ids.admin]);assert.equal(await count(db,'memberships'),1);
+ assert.equal((await db.query('select count(*) n from private.owner_bootstrap')).rows[0].n,0);
+ }finally{await db.close();}
+});
 
 test('production migration preserves records, separates five roles and denies cross-tenant access',async()=>{
  const db=await database();try {

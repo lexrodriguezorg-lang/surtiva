@@ -21,9 +21,9 @@ test('auth cookies are HttpOnly Secure; responses never expose tokens',async()=>
 test('verified session cannot query another tenant or arbitrary table',async()=>{
  const calls=[];const handler=createHandler({env,fetcher:async url=>{
   calls.push(url);if(url.endsWith('/auth/v1/user'))return response({id:ids.owner,email:'owner@example.test',email_confirmed_at:'2026-01-01'});
-  if(url.includes('/memberships?'))return response([{organization_id:ids.org,role_id:'distribuidor'}]);
-  if(url.includes('/organizations?'))return response([{id:ids.org}]);
-  if(url.includes('/role_permissions?'))return response([{role_id:'distribuidor',permission_id:'catalog.read'}]);
+  if(url.includes('/memberships?'))return response([{organization_id:ids.org,role_id:'distributor_admin',status:'active'}]);
+  if(url.includes('/organizations?'))return response([{id:ids.org,status:'active',kind:'distribuidor'}]);
+  if(url.includes('/role_permissions?'))return response([{role_id:'distributor_admin',permission_id:'catalog.read'}]);
   return response([]);
  }});
  const headers={cookie:'__Host-surtiva-access=valid'};
@@ -35,7 +35,7 @@ test('public registration rejects platform roles and never sets an authenticated
  const bodies=[];const handler=createHandler({env,fetcher:async(url,options)=>{bodies.push(JSON.parse(options.body));return response({user:{id:ids.pending}});}});
  const form={name:'A',email:'a@example.test',password:'long-password',organization:'Company',role:'admin'};
  assert.equal((await call(handler,req('auth/register','POST',form))).status,400);
- const ok=await call(handler,req('auth/register','POST',{...form,role:'comercio',isAdmin:true}));assert.equal(ok.status,202);assert.equal(ok.headers['Set-Cookie'],undefined);assert.equal(bodies[0].data.isAdmin,undefined);
+ const ok=await call(handler,req('auth/register','POST',{...form,role:'merchant',isAdmin:true}));assert.equal(ok.status,202);assert.equal(ok.headers['Set-Cookie'],undefined);assert.equal(bodies[0].data.isAdmin,undefined);
 });
 test('Vercel rewrite preserves nested API routes and tenant query parameters',async()=>{
  const handler=createHandler({env,fetcher:async()=>response({access_token:'access',refresh_token:'refresh',expires_in:3600})});

@@ -1,6 +1,6 @@
-import {backend,HttpError} from './backend.mjs';
+import {backend,HttpError,config} from './backend.mjs';
 
-const resources={products:'catalog.read',inventory:'inventory.manage',customers:'customers.read',sellers:'team.read',suppliers:'suppliers.read',orders:'orders.read',order_lines:'orders.read',order_events:'orders.read',commissions:'commissions.read',followups:'followups.manage',receivables:'receivables.read',retail_inventory:'retail.manage',local_sales:'retail.manage',fulfillment_points:'fulfillment.read',fulfillment_records:'fulfillment.read',memberships:'team.read',catalog_access:'catalog.read'};
+const resources={products:'catalog.read',inventory:'inventory.manage',clients:'customers.read',sellers:'team.read',suppliers:'suppliers.read',orders:'orders.read',order_items:'orders.read',order_events:'orders.read',commissions:'commissions.read',followups:'followups.manage',invoices:'receivables.read',retail_inventory:'retail.manage',local_sales:'retail.manage',fulfillment_nodes:'fulfillment.read',fulfillment_records:'fulfillment.read',memberships:'team.read',catalog_access:'catalog.read',distributor_products:'catalog.read',invitations:'team.read',organization_relationships:'team.read'};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function validId(value) { if(!uuid.test(value||'')) throw new HttpError(400,'Identificador inválido.'); return value; }
 const text=(value,min,max)=>{ if(typeof value!=='string'||value.trim().length<min||value.trim().length>max)throw new HttpError(400,'Revisa los campos del formulario.');return value.trim(); };
@@ -36,18 +36,19 @@ async function identity(service,token) {
  return user;
 }
 async function context(service,token,user) {
- const [admins,memberships,organizations,requests,permissions]=await Promise.all([
-  service.db('platform_admins?select=user_id&user_id=eq.'+user.id,{token}),
-  service.db('memberships?select=*&user_id=eq.'+user.id+'&active=eq.true',{token}),
+ const [memberships,organizations,requests,permissions]=await Promise.all([
+  service.db('memberships?select=*&user_id=eq.'+user.id,{token}),
   service.db('organizations?select=*&order=name',{token}),
   service.db('access_requests?select=*&user_id=eq.'+user.id,{token}),
   service.db('role_permissions?select=*',{token})
  ]);
- return {user:{id:user.id,email:user.email,name:user.user_metadata?.name||user.email},isAdmin:admins.length>0,memberships:memberships.filter(m=>organizations.some(o=>o.id===m.organization_id)),organizations,request:requests[0]||null,permissions};
+ const accountStates=memberships.map(m=>m.status!=='active'?m.status:organizations.find(o=>o.id===m.organization_id)?.status||'suspended');
+ const accountStatus=['active','suspended','rejected','pending'].find(status=>accountStates.includes(status))||requests[0]?.status||'pending';
+ return {user:{id:user.id,email:user.email,name:user.user_metadata?.name||user.email},isAdmin:memberships.some(m=>m.role_id==='surtiva_admin'&&m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.kind==='plataforma'&&o.status==='active')),accountStatus,memberships:memberships.filter(m=>m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.status==='active')),organizations,request:requests[0]||null,permissions};
 }
 export function createHandler({env=process.env,fetcher=fetch}={}) {
  return async function handler(req,res) {
-  res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('Vary','Cookie');res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('Vary','Authorization, Cookie');res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('X-Content-Type-Options','nosniff');
   const reply=(status,data)=>{res.statusCode=status;res.end(JSON.stringify(data));};
   try {
    const url=new URL(req.url,'http://localhost');
@@ -55,13 +56,14 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    if(!['GET','POST','PATCH'].includes(req.method))throw new HttpError(405,'Método no permitido.');
    let body={}; if(req.method!=='GET'){originCheck(req,env);body=await readBody(req);if(!body||Array.isArray(body)||typeof body!=='object')throw new HttpError(400,'Solicitud inválida.');}
    const secure=secureRequest(env), prefix=secure?'__Host-surtiva-':'surtiva-';
-   const jar=cookies(req),token=jar[prefix+'access'];
+   const jar=cookies(req),token=req.headers.authorization?.match(/^Bearer ([^\s]+)$/)?.[1]||jar[prefix+'access'];
    if(path==='auth/logout'&&req.method==='POST') {
     setSession(res,null,secure);
     if(token)await backend({env,fetcher}).auth('logout',{token,method:'POST'}).catch(()=>{});
     return reply(200,{ok:true});
    }
-   if(path==='health'&&req.method==='GET') {return reply(200,{configured:!!(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY),version:'0.8.0'});}
+   if(path==='health'&&req.method==='GET') {return reply(200,{configured:!!(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY),version:'0.9.0'});}
+   if(path==='config'&&req.method==='GET') {const {url,key}=config(env);return reply(200,{url,publishableKey:key});}
    // Reject private requests before contacting an unavailable backend.
    if(!path.startsWith('auth/')&&!token)throw new HttpError(401,'Ingresa para continuar.');
    const service=backend({env,fetcher});
@@ -69,7 +71,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     const email=text(body.email,3,254).toLowerCase(); if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new HttpError(400,'Correo inválido.');
     const password=body.password;if(typeof password!=='string'||password.length<(path==='auth/register'?12:1)||password.length>128)throw new HttpError(400,'La contraseña debe tener entre 12 y 128 caracteres.');
     if(path==='auth/register') {
-     if(!['distribuidor','vendedor','comercio','aliado'].includes(body.role))throw new HttpError(400,'Selecciona un perfil válido.');
+     if(!['distributor_admin','seller','merchant','fulfillment_partner'].includes(body.role))throw new HttpError(400,'Selecciona un perfil válido.');
      await service.auth('signup',{method:'POST',body:{email,password,data:{name:text(body.name,1,100),organization_name:text(body.organization,1,120),requested_role:body.role},...(body.captchaToken?{gotrue_meta_security:{captcha_token:text(body.captchaToken,1,4096)}}:{})}});
      return reply(202,{message:'Si el correo puede registrarse, recibirás un mensaje de verificación. Tu solicitud quedará pendiente de aprobación.'});
     }
@@ -97,20 +99,39 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     if(!ctx.isAdmin||typeof body.enabled!=='boolean')throw new HttpError(403,'No autorizado.');
     await service.db('rpc/set_membership_active',{token,method:'POST',body:{membership_id:validId(body.id),enabled:body.enabled}});return reply(200,{ok:true});
    }
+   if(path==='admin/status'&&req.method==='POST') {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    await service.db('rpc/set_account_status',{token,method:'POST',body:{entity_kind:body.kind,entity_key:validId(body.id),new_status:body.status}});return reply(200,{ok:true});
+   }
+   if(path==='admin/plan'&&req.method==='POST') {
+    if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
+    await service.db('rpc/set_organization_plan',{token,method:'POST',body:{org:validId(body.id),plan:body.plan}});return reply(200,{ok:true});
+   }
+   if(path==='invitation/accept'&&req.method==='POST') {
+    const id=await service.db('rpc/accept_invitation',{token,method:'POST',body:{invitation_token:text(body.token,60,100)}});return reply(200,{id});
+   }
    const org=validId(url.searchParams.get('organization'));
    const membership=ctx.memberships.find(m=>m.organization_id===org);
    if(!ctx.organizations.some(o=>o.id===org)||(!ctx.isAdmin&&!membership))throw new HttpError(403,'No tienes acceso a esta organización.');
    const can=permission=>ctx.isAdmin||ctx.permissions.some(p=>p.role_id===membership.role_id&&p.permission_id===permission);
+   if(path==='clients/assign'&&req.method==='POST') {
+    if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
+    await service.db('rpc/assign_client_seller',{token,method:'POST',body:{org,client_key:validId(body.id),seller_key:body.sellerId?validId(body.sellerId):null}});return reply(200,{ok:true});
+   }
+   if(path==='invitations'&&req.method==='POST') {
+    if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
+    const result=await service.db('rpc/create_invitation',{token,method:'POST',body:{org,recipient_email:text(body.email,3,254),recipient_name:text(body.name,1,100),requested_role:body.role}});return reply(201,result);
+   }
    if(path==='entities'&&req.method==='POST') {
-    if(!ctx.isAdmin&&membership.role_id!=='distribuidor')throw new HttpError(403,'No autorizado.');
+    if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
     const id=await service.db('rpc/create_entity',{token,method:'POST',body:{org,kind:body.kind,payload:body.payload}});return reply(201,{id});
    }
    if(path==='catalog/access'&&req.method==='POST') {
-    if((!ctx.isAdmin&&membership.role_id!=='distribuidor')||typeof body.enabled!=='boolean')throw new HttpError(403,'No autorizado.');
+    if((!ctx.isAdmin&&membership.role_id!=='distributor_admin')||typeof body.enabled!=='boolean')throw new HttpError(403,'No autorizado.');
     await service.db('rpc/set_catalog_access',{token,method:'POST',body:{org,product_key:validId(body.productId),entity_kind:body.entityKind,entity_key:validId(body.entityId),enabled:body.enabled}});return reply(200,{ok:true});
    }
    if(path==='orders/assign'&&req.method==='POST') {
-    if(!ctx.isAdmin&&membership.role_id!=='distribuidor')throw new HttpError(403,'No autorizado.');
+    if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
     await service.db('rpc/assign_fulfillment',{token,method:'POST',body:{org,order_key:validId(body.id),point_key:validId(body.pointId)}});return reply(200,{ok:true});
    }
    if(path==='retail'&&req.method==='PATCH') {
@@ -127,17 +148,16 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     const table=path.slice(5),permission=resources[table];
     if(!permission||!can(permission))throw new HttpError(403,'No tienes permiso para consultar esta sección.');
     const offset=Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000));
-    let query=table+'?select=*&organization_id=eq.'+org+'&order='+(table==='products'?'sku':table==='inventory'?'product_id':table==='retail_inventory'?'customer_id,product_id':'id')+'&limit=100&offset='+Math.floor(offset);
-    if(url.searchParams.has('id'))query+='&id=eq.'+validId(url.searchParams.get('id'));
-    if(url.searchParams.has('order'))query+='&order_id=eq.'+validId(url.searchParams.get('order'));
-    return reply(200,await service.db(query,{token}));
+    return reply(200,await service.db('rpc/workspace_data',{token,method:'POST',body:{org,resource:table,page_offset:Math.floor(offset),order_filter:url.searchParams.has('order')?validId(url.searchParams.get('order')):null}}));
    }
    if(path==='orders'&&req.method==='POST') {
     if(!can('orders.create'))throw new HttpError(403,'No puedes crear pedidos.');
-    const result=await service.db('rpc/create_order',{token,method:'POST',body:{org,customer_key:validId(body.customerId),items:body.items,request_key:validId(body.requestKey)}});return reply(201,{id:result});
+    const tradeOrg=await service.db('rpc/resolve_trade_organization',{token,method:'POST',body:{workspace:org,client_key:validId(body.customerId),order_key:null}});
+    const result=await service.db('rpc/create_order',{token,method:'POST',body:{org:tradeOrg,customer_key:validId(body.customerId),items:body.items,request_key:validId(body.requestKey)}});return reply(201,{id:result});
    }
    if(path==='orders/status'&&req.method==='POST') {
-    const result=await service.db('rpc/transition_order',{token,method:'POST',body:{org,order_key:validId(body.id),next_status:body.status}});return reply(200,{status:result});
+    const tradeOrg=await service.db('rpc/resolve_trade_organization',{token,method:'POST',body:{workspace:org,client_key:null,order_key:validId(body.id)}});
+    const result=await service.db('rpc/transition_order',{token,method:'POST',body:{org:tradeOrg,order_key:validId(body.id),next_status:body.status}});return reply(200,{status:result});
    }
    if(path==='followups'&&req.method==='POST') {
     if(!can('followups.manage'))throw new HttpError(403,'No autorizado.');
@@ -153,3 +173,4 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
  };
 }
 export default createHandler();
+

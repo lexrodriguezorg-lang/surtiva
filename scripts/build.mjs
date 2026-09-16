@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
+import { build } from 'esbuild';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,9 +14,10 @@ await fs.mkdir(out, { recursive: true });
 await fs.copyFile(path.join(root, 'index.html'), path.join(out, 'index.html'));
 
 await fs.mkdir(path.join(out, 'src'), { recursive: true });
-for (const file of ['operacion.css', 'tienda.css', 'plataforma.css', 'plataforma.js']) {
+for (const file of ['operacion.css', 'tienda.css', 'plataforma.css']) {
   await fs.copyFile(path.join(root, 'src', file), path.join(out, 'src', file));
 }
+await build({entryPoints:[path.join(root,'src/plataforma.js')],outfile:path.join(out,'src/plataforma.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true});
 await fs.cp(path.join(root, 'public'), out, { recursive: true });
 
 const packs = ['productos-1.json.gz', 'productos-2.json.gz'];

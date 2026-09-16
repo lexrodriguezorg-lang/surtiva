@@ -1,6 +1,6 @@
 {
   "name": "surtiva",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Surtiva: plataforma comercial multiempresa con acceso aprobado",
@@ -15,6 +15,10 @@
     "node": "24.x"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8"
+    "@electric-sql/pglite": "^0.5.8",
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0"
   }
 }

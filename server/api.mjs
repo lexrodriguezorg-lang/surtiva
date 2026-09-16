@@ -44,7 +44,7 @@ async function context(service,token,user) {
  ]);
  const accountStates=memberships.map(m=>m.status!=='active'?m.status:organizations.find(o=>o.id===m.organization_id)?.status||'suspended');
  const accountStatus=['active','suspended','rejected','pending'].find(status=>accountStates.includes(status))||requests[0]?.status||'pending';
- return {user:{id:user.id,email:user.email,name:user.user_metadata?.name||user.email},isAdmin:memberships.some(m=>m.role_id==='surtiva_admin'&&m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.kind==='plataforma'&&o.status==='active')),accountStatus,memberships:memberships.filter(m=>m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.status==='active')),organizations,request:requests[0]||null,permissions};
+ return {user:{id:user.id,email:user.email,name:user.user_metadata?.name||user.email,avatarUrl:typeof user.user_metadata?.avatar_url==='string'&&user.user_metadata.avatar_url.length<60000&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(user.user_metadata.avatar_url)?user.user_metadata.avatar_url:null},isAdmin:memberships.some(m=>m.role_id==='surtiva_admin'&&m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.kind==='plataforma'&&o.status==='active')),accountStatus,memberships:memberships.filter(m=>m.status==='active'&&organizations.some(o=>o.id===m.organization_id&&o.status==='active')),organizations,request:requests[0]||null,permissions};
 }
 export function createHandler({env=process.env,fetcher=fetch}={}) {
  return async function handler(req,res) {

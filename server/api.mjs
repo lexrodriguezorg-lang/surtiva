@@ -39,7 +39,7 @@ async function context(service,token,user) {
  const [admins,memberships,organizations,requests,permissions]=await Promise.all([
   service.db('platform_admins?select=user_id&user_id=eq.'+user.id,{token}),
   service.db('memberships?select=*&user_id=eq.'+user.id+'&active=eq.true',{token}),
-  service.db('organizations?select=*&active=eq.true&order=name',{token}),
+  service.db('organizations?select=*&order=name',{token}),
   service.db('access_requests?select=*&user_id=eq.'+user.id,{token}),
   service.db('role_permissions?select=*',{token})
  ]);

@@ -16,7 +16,7 @@ function setSession(res,session,secure) {
 function secureRequest(env) {return env.NODE_ENV==='production'||!!env.VERCEL;}
 function originCheck(req,env) {
  const expected=env.APP_ORIGIN||(env.VERCEL_URL?'https://'+env.VERCEL_URL:'http://localhost:3000');
- const allowed=[expected,...[env.VERCEL_URL,env.VERCEL_BRANCH_URL].filter(Boolean).map(host=>'https://'+host)];
+ const allowed=[expected,...(env.APP_ADDITIONAL_ORIGINS||'').split(',').map(value=>value.trim()).filter(Boolean),...[env.VERCEL_URL,env.VERCEL_BRANCH_URL].filter(Boolean).map(host=>'https://'+host)];
  if(!allowed.includes(req.headers.origin))throw new HttpError(403,'Origen de solicitud no permitido.');
  if(!String(req.headers['content-type']||'').startsWith('application/json'))throw new HttpError(415,'Se requiere JSON.');
 }

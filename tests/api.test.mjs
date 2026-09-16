@@ -6,6 +6,12 @@ const env={SUPABASE_URL:'https://test.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_
 function req(path,method='GET',body,headers={}) {return {url:'/api/'+path,method,body,headers:{...(method!=='GET'?{origin:env.APP_ORIGIN,'content-type':'application/json'}:{}),...headers}};}
 async function call(handler,request) {const headers={};let body;const res={setHeader:(k,v)=>headers[k]=v,end:v=>body=JSON.parse(v)};await handler(request,res);return {status:res.statusCode,headers,body};}
 const response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+
+test('custom domain migration permits only explicit origins, including the existing domain',async()=>{
+ const handler=createHandler({env:{...env,APP_ORIGIN:'https://surtiva.com.co',APP_ADDITIONAL_ORIGINS:'https://www.surtiva.com.co, https://surtiva-o3hj.vercel.app'}});
+ for(const origin of ['https://surtiva.com.co','https://www.surtiva.com.co','https://surtiva-o3hj.vercel.app'])assert.equal((await call(handler,req('auth/logout','POST',{}, {origin}))).status,200);
+ for(const origin of ['https://surtiva.com.co.evil.test','http://surtiva.com.co','https://evil.test'])assert.equal((await call(handler,req('auth/logout','POST',{}, {origin}))).status,403);
+});
 test('API denies unauthenticated access, missing config and cross-origin requests without leaking data',async()=>{
  let called=0;const handler=createHandler({env:{},fetcher:async()=>{called++;throw Error();}});
  const missing=await call(handler,req('data/products?organization='+ids.org));assert.equal(missing.status,401);assert.equal(called,0);assert.match(missing.headers['Cache-Control'],/no-store/);

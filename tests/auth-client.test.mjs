@@ -12,6 +12,36 @@ test('expired links have a recoverable message and callback credentials are remo
  assert.equal(readAuthReturn('https://surtiva.test/#ingresar'),null);
 });
 
+test('recovery code uses Supabase verification; rejected codes cannot update a password',async()=>{
+ const oldFetch=globalThis.fetch,oldLocation=globalThis.location;
+ const requests=[];let rejectCode=true,client;
+ const user={id:'90000000-0000-4000-8000-000000000021',email:'recovery@example.test',aud:'authenticated',app_metadata:{},user_metadata:{},created_at:new Date().toISOString()};
+ globalThis.location={origin:'https://surtiva.test'};
+ globalThis.fetch=async(input,options={})=>{
+  if(input==='/api/config')return Response.json({url:'https://recovery.supabase.co',publishableKey:'sb_publishable_test'});
+  const url=new URL(input),body=options.body?JSON.parse(options.body):null;requests.push({url,body});
+  if(url.pathname.endsWith('/verify'))return rejectCode?Response.json({code:403,error_code:'otp_expired',msg:'expired'},{status:403}):Response.json({access_token:'test-token',refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user});
+  if(url.pathname.endsWith('/user'))return Response.json({user});
+  if(url.pathname.endsWith('/logout'))return new Response(null,{status:204});
+  throw Error('Unexpected request '+url.pathname);
+ };
+ try{
+  const {authenticate,supabase}=await import('../src/auth.js?recovery-test');client=await supabase();
+  await assert.rejects(authenticate('verify-recovery',{email:user.email,token:'not-a-code'}),/numérico/);
+  assert.equal(requests.length,0);
+  await assert.rejects(authenticate('verify-recovery',{email:user.email,token:'12345678'}),/código venció/);
+  assert.equal((await client.auth.getSession()).data.session,null);
+  assert.equal(requests.some(r=>r.url.pathname.endsWith('/user')),false);
+  rejectCode=false;
+  await authenticate('verify-recovery',{email:' '+user.email+' ',token:'12345678',type:'signup'});
+  assert.deepEqual(requests.findLast(r=>r.url.pathname.endsWith('/verify')).body,{email:user.email,token:'12345678',type:'recovery',gotrue_meta_security:{}});
+  assert.ok((await client.auth.getSession()).data.session);
+  await authenticate('password',{password:'test-only-new-password'});
+  assert.equal(requests.findLast(r=>r.url.pathname.endsWith('/user')).body.password,'test-only-new-password');
+  await client.auth.signOut({scope:'local'});
+ }finally{if(client)await client.auth.stopAutoRefresh();globalThis.fetch=oldFetch;if(oldLocation===undefined)delete globalThis.location;else globalThis.location=oldLocation;}
+});
+
 test('signup and resend preserve the PKCE verifier until code exchange with the real SDK',async()=>{
  const oldFetch=globalThis.fetch,oldLocation=globalThis.location;
  const requests=[];

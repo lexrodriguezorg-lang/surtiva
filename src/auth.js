@@ -37,7 +37,16 @@ export async function authenticate(action,fields={}) {
   const {error}=await client.auth.resend({type:'signup',email:fields.email,options:{emailRedirectTo:location.origin+'/?auth=confirmed#ingresar'}});authError(error);
   return {message:'Si tu cuenta aún necesita verificación, recibirás un nuevo correo. Abre el más reciente en este mismo navegador. Si ya confirmaste tu correo, ingresa con tu contraseña.'};
  }
- if(action==='recover'){const {error}=await client.auth.resetPasswordForEmail(fields.email,{redirectTo:location.origin+'/?auth=recovery#nueva-clave'});authError(error);return {message:'Si la cuenta existe, recibirás un enlace para cambiar tu contraseña.'};}
+ if(action==='recover'){const {error}=await client.auth.resetPasswordForEmail(fields.email.trim(),{redirectTo:location.origin+'/?auth=recovery#nueva-clave'});authError(error);return {message:'Si la cuenta existe, recibirás un correo de recuperación. Si contiene un código, introdúcelo aquí; si contiene un enlace, puedes abrirlo en este navegador.'};}
+ if(action==='verify-recovery'){
+  const token=String(fields.token||'').trim();
+  if(!/^\d{6,10}$/.test(token))throw Error('Introduce el código numérico que recibiste por correo.');
+  const {data,error}=await client.auth.verifyOtp({email:fields.email.trim(),token,type:'recovery'});
+  if(error?.code==='otp_expired')throw Error('El código venció, ya se usó o no coincide. Solicita otro correo y utiliza únicamente el código más reciente.');
+  authError(error);
+  if(!data.session)throw Error('No se pudo verificar la recuperación. Solicita un nuevo código.');
+  return {ok:true};
+ }
  if(action==='password'){if(fields.password.length<12)throw Error('Usa al menos 12 caracteres.');const {error}=await client.auth.updateUser({password:fields.password});authError(error);return {ok:true};}
  throw Error('Acción no disponible.');
 }

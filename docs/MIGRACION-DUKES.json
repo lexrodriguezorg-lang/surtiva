@@ -1,0 +1,20 @@
+{
+  "organizationId": "ce36841a-9497-4f3c-8f78-537f730ef035",
+  "source": "src/datos/catalogo.json + seed() original",
+  "organizations": 1,
+  "sellers": 1,
+  "fulfillment_points": 1,
+  "customers": 3,
+  "suppliers": 0,
+  "products": 1072,
+  "inventory": 1072,
+  "catalog_access": 4288,
+  "orders": 6,
+  "order_lines": 12,
+  "order_events": 11,
+  "commissions": 6,
+  "receivables": 3,
+  "retail_inventory": 36,
+  "followups": 1,
+  "fulfillment_records": 6
+}

@@ -1,6 +1,6 @@
 # Modelo de producción — revisión del 16 de septiembre de 2026
 
-Se conserva la aplicación JavaScript y su identidad visual, el catálogo fuente y Vercel `surtiva-o3hj`. El backend elegido por el propietario es Supabase `surtiva-production`, referencia `yirefmallnkgbckrbvrw`. La conexión MCP OAuth está registrada y autenticada con permisos de lectura; esta sesión aún no expone sus herramientas. No se ha inspeccionado ni modificado la base remota.
+Se conserva JavaScript, su identidad visual, el catálogo y Vercel `surtiva-o3hj`. El backend es Supabase `surtiva-production`, referencia `yirefmallnkgbckrbvrw`. Se inspeccionó vacío mediante MCP OAuth y se aplicaron las migraciones después de probarlas y obtener aprobación específica de escritura. El informe remoto demuestra aislamiento con dos usuarios Auth reales de prueba.
 
 ## Corrección respecto al primer modelo
 

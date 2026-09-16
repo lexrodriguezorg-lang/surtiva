@@ -2,6 +2,8 @@
 
 Inspección: 16 de septiembre de 2026, antes de implementar persistencia.
 
+> Registro histórico de la inspección inicial. El modelo actual está en `MODELO-PRODUCCION.md` y la configuración vigente en `ACTIVACION.md`. Las subcuentas y la semilla de demo descritas aquí fueron sustituidas para producción por las migraciones 006–013 y `dukes-pilot.sql`.
+
 ## Base verificada
 
 - Carpeta de trabajo: `C:/Users/HP/Downloads/SURTIVA`.

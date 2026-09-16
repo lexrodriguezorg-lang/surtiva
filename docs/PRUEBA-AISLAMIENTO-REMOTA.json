@@ -1,0 +1,120 @@
+{
+  "project": "yirefmallnkgbckrbvrw",
+  "date": "2026-09-16T15:13:23.078Z",
+  "appUrl": "http://localhost:3000",
+  "method": "Real Supabase Auth passwords + user JWT + PostgREST RLS; no service key",
+  "organizations": [
+    {
+      "label": "A",
+      "id": "5faf67e1-fc12-4a9a-b8df-b3ed95bb47db"
+    },
+    {
+      "label": "B",
+      "id": "3f484f46-bbd2-4f27-9aed-95eb9ac99703"
+    }
+  ],
+  "checks": [
+    {
+      "user": "A",
+      "resource": "products",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "resource": "distributor_products",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "resource": "inventory",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "resource": "sellers",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "resource": "suppliers",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "resource": "memberships",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "A",
+      "organizationRows": 1,
+      "foreignProfiles": 0,
+      "globalAuditRows": 0,
+      "foreignMutationRows": 0,
+      "approvalStatus": 403,
+      "foreignWorkspaceStatus": 403
+    },
+    {
+      "user": "A",
+      "apiSessionStatus": 200,
+      "apiCrossTenantStatus": 403
+    },
+    {
+      "user": "B",
+      "resource": "products",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "resource": "distributor_products",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "resource": "inventory",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "resource": "sellers",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "resource": "suppliers",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "resource": "memberships",
+      "ownRows": 1,
+      "foreignRows": 0
+    },
+    {
+      "user": "B",
+      "organizationRows": 1,
+      "foreignProfiles": 0,
+      "globalAuditRows": 0,
+      "foreignMutationRows": 0,
+      "approvalStatus": 403,
+      "foreignWorkspaceStatus": 403
+    },
+    {
+      "user": "B",
+      "apiSessionStatus": 200,
+      "apiCrossTenantStatus": 403
+    }
+  ],
+  "anonymousReadStatus": 401,
+  "passed": true
+}

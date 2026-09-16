@@ -1,50 +1,54 @@
-# Activación de SURTIVA
+# SURTIVA — activación y operación
 
-## Proyecto exacto
+## Proyectos verificados
 
-Repositorio: `lexrodriguezorg-lang/surtiva`. Producción: `https://surtiva-o3hj.vercel.app`.
-El estado GitHub del commit original confirma el proyecto Vercel `surtiva-o3hj` en el equipo `lexrodriguezorg-4994s-projects`. La conexión Vercel de esta sesión no permite consultarlo (404), aunque muestra otro proyecto del equipo. No enlazar el repositorio al proyecto `agencia-digital-gestion`.
+- GitHub: lexrodriguezorg-lang/surtiva.
+- Vercel: surtiva-o3hj, ID prj_vwgtk9U2KB6D0Vz1J4F3TG6SNc61.
+- Producción: https://surtiva-o3hj.vercel.app
+- Supabase: surtiva-production, referencia yirefmallnkgbckrbvrw.
 
-Acceso recuperado mediante CLI: `.vercel/project.json` identifica `prj_vwgtk9U2KB6D0Vz1J4F3TG6SNc61`. El conector sigue limitado, pero la CLI permite inspeccionar y desplegar el proyecto correcto. Se publica primero el cierre seguro: portada disponible y cuentas deshabilitadas mientras falten las variables Supabase. Esto retira el dashboard público de la demo sin conceder acceso simulado.
+El proyecto Supabase se inspeccionó vacío mediante MCP. Se aplicaron las migraciones 001–013. No repetir archivos ya registrados: las siguientes modificaciones requieren otra migración. OAuth tiene lectura de organizaciones/proyectos y lectura/escritura de base de datos, esta última aprobada expresamente por el propietario.
 
-## Backend recomendado e implementado
+## Arquitectura activa
 
-Supabase Auth + PostgreSQL + RLS; API de Vercel sin clave administrativa. Identidad y datos comerciales son entidades diferentes. Los módulos antiguos permanecen en el repositorio como fuente de migración, pero no se distribuyen en el build.
+Se conserva JavaScript, el diseño y Vercel. src/auth.js usa Supabase JS, Publishable key, Auth y PKCE. La API verifica el JWT con Supabase y consulta como ese usuario. RLS protege también llamadas directas a PostgREST. No hay service key en el cliente ni en endpoints comerciales.
 
-1. Seleccionar un proyecto Supabase **nuevo o expresamente reservado para SURTIVA**, no una base existente de otra aplicación. Las migraciones crean tablas en `public` y un trigger en `auth.users`.
-2. Ejecutar en orden `supabase/migrations/001_multitenant.sql` a `005_local_sales.sql` con el SQL Editor o el flujo de migraciones Supabase. Cada archivo es transaccional; se aplica una sola vez. No aplicarlo sobre tablas homónimas de otra aplicación.
-3. Generar la semilla con `node scripts/migrate-demo.mjs` y aplicar `supabase/seed/dukes.sql`. Es idempotente, no reemplaza datos operativos, no crea cuentas ni contraseñas y marca Dukes como ejemplo. Sus existencias son simuladas o desconocidas, nunca derivadas del campo “Paca”. No hay proveedores ficticios: Daniela representaba a la operadora del distribuidor.
-4. Configurar en Supabase Auth: email/password activo, confirmación de correo obligatoria, registro habilitado, URL del sitio `https://surtiva-o3hj.vercel.app/#ingresar`, contraseña mínima de 12 caracteres y límites de intentos apropiados. El flujo actual es contraseña + verificación de email; no utiliza enlaces de sesión automática ni tokens en URL. Comprobar entrega de los correos del proveedor antes de abrir altas reales. No se añadió proveedor de correo, pagos ni integración comercial externa.
-5. Configurar **solo en servidor** en Vercel: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (publishable o JWT anon; nunca secret/service_role) y `APP_ORIGIN=https://surtiva-o3hj.vercel.app`. En preview se acepta también el hostname exacto de `VERCEL_URL`. Para desarrollo usar `.env.local` basado en `.env.example`.
-6. Registrar y verificar la cuenta real del administrador mediante “Solicitar acceso”. Otorgar el privilegio inicial desde SQL Editor con el UUID confirmado de ese usuario, nunca por metadatos ni por el rol que selecciona el formulario:
+Distribuidores, comercios y aliados tienen organizaciones independientes. Los vendedores pertenecen al distribuidor. Solo se comparten catálogo habilitado, pedidos, facturas y despachos de relaciones autorizadas. Inventario y ventas locales pertenecen al comercio. Surtiva tiene organización de plataforma; Dukes es un distribuidor piloto.
 
-```sql
--- Reemplazar por el UUID de la cuenta propietaria VERIFICADA.
-insert into public.platform_admins(user_id)
-select id from auth.users
-where id = 'UUID_CONFIRMADO'::uuid and email_confirmed_at is not null
-on conflict (user_id) do nothing;
-```
+Estados: pending, active, suspended, rejected. Roles: surtiva_admin, distributor_admin, seller, merchant, fulfillment_partner. Los planes se almacenan por organización, sin cobros ni integraciones de pago.
 
-7. Ingresar como administrador Surtiva. Revisar solicitudes. Para un nuevo distribuidor, crear su organización durante la aprobación. Para vendedor, comercio o aliado, elegir organización y entidad existente. El distribuidor puede crear vendedores, clientes, proveedores, puntos y productos desde sus secciones; puede habilitar catálogo por vendedor/comercio y asignar puntos a pedidos. Una cuenta puede tener varias membresías; cada sesión selecciona una organización autorizada. El administrador puede revocar membresías.
-8. Crear preview desde la rama y validar con usuarios de dos organizaciones distintas. Solo después de backend configurado y pruebas reales de autenticación, habilitar las cuentas en producción. El cierre público inicial puede desplegarse antes: sin configuración, todos los datos permanecen inaccesibles y los formularios informan que el acceso aún no está habilitado.
+## Configuración y administrador
 
-## Verificación por bloque
+Vercel Production y Preview usan SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY. /api/config entrega únicamente esos valores públicos. APP_ORIGIN valida escrituras. La CSP permite el proyecto Supabase exacto. .env.local está ignorado por Git.
 
-`npm ci`, `npm test`, `npm run build`, `npm run check`. Las pruebas usan PostgreSQL embebido (PGlite), ejecutan el SQL real y simulan solamente el esquema Auth y los roles que Supabase proporciona. Las pruebas de API usan respuestas controladas del proveedor: **no sustituyen** una prueba de registro y correo contra Supabase real.
+El propietario confirmó Site URL https://surtiva-o3hj.vercel.app y Redirect URLs https://surtiva-o3hj.vercel.app/** y http://localhost:3000/**.
 
-En cada preview comprobar `/api/health`, acceso anónimo `401` a `/api/session` y a datos, `404` a `/data/catalogo.js` y `/src/operacion.js`, formulario público y rutas internas. Un servidor sin variables responde `503` al intentar autenticarse; nunca concede una sesión de prueba ni confirma que guardó una solicitud inexistente.
+La cuenta administradora elegida es lexrodriguezorg@mail.com. Debe registrarse desde Solicitar acceso, indicar Surtiva, seleccionar Distribuidor y verificar su correo. Un mecanismo privado de un solo uso activa surtiva_admin en la organización Surtiva al confirmar esa dirección. No confía en roles de metadatos ni concede acceso sin verificación.
 
-Casos reales antes de promover: verificar correo, estado pendiente, rechazo, aprobación por administrador, nueva organización vacía, acceso Dukes separado, vendedor con otro cliente, comercio con otra cartera, aliado con otro pedido, inventario insuficiente, cierre de sesión y revocación. La sesión usa cookies HttpOnly/Secure/SameSite, se verifica con Auth y las consultas se ejecutan como el usuario bajo RLS.
+No insertar administradores en la antigua tabla platform_admins: la autoridad real es la membresía surtiva_admin en una organización de tipo plataforma. La tabla anterior permanece como compatibilidad histórica.
 
-## Datos de pruebas guardados en navegadores
+Mantener verificación de correo. Comprobar entrega real antes de abrir altas externas: el SMTP predeterminado de Supabase solo admite direcciones del equipo y no sirve para registros comerciales generales. SMTP propio requiere un proveedor elegido por el propietario; no se instala una integración externa en esta fase. [Documentación de SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
 
-No hay sincronización automática del antiguo `localStorage`. Las modificaciones hechas allí no existían en el repositorio ni en Vercel. Conservar una exportación antes de limpiar el navegador. La migración incluida conserva el catálogo y `seed()` del repositorio confirmado. No se importan archivos locales adicionales como datos confiables ni se ejecuta su contenido. Los módulos originales permiten recuperar/exportar el escenario desde una copia local aislada; no deben volver a publicarse como puerta de acceso.
+Después de ingresar como administrador, revisar solicitudes. La aprobación crea o vincula una organización del tipo correcto y activa su membresía. Las invitaciones entregan un enlace para compartir; no envían correos ni conceden acceso automático. El distribuidor asigna vendedores a comercios, habilita catálogo y asigna cumplimiento a pedidos.
 
-## Límites deliberados de esta fase
+## Catálogo conservado
 
-No hay cobros, pasarelas, conciliación automática, envío de invitaciones ni integración con software externo. Los registros históricos de cartera y estados de pago son informativos. La política de comisión del escenario Dukes es 8%; organizaciones nuevas empiezan en 0 hasta definir su política. La membresía de comercio es una cuenta comercial en la organización distribuidora, con su inventario/ventas aislados por cliente. No se comparte información automáticamente entre organizaciones; una futura relación entre dos tenants necesita autorización explícita de ambas partes.
+node scripts/migrate-pilot.mjs genera supabase/seed/dukes-pilot.sql. La semilla idempotente incorpora Dukes y 1.072 productos originales. Sus ofertas se crean en distributor_products. El inventario queda sin cantidad confirmada, reservado cero. No crea usuarios, clientes, vendedores, pedidos, cartera ni ventas ficticias. Los precios históricos requieren revisión comercial antes de operar.
 
-## Reversión
+**No aplicar supabase/seed/dukes.sql en producción**: conserva la demo únicamente para regresiones del modelo anterior. Los módulos antiguos y los datos de localStorage no se publican ni se importan automáticamente.
 
-No revertir al acceso por perfiles de la demo para solucionar un fallo de Auth. Mantener la portada pública y acceso cerrado mientras se corrige configuración. Los cambios de datos se respaldan en Supabase antes de cualquier migración posterior; estas migraciones son aditivas y no eliminan el catálogo fuente. Las credenciales nunca se incluyen en Git ni en artefactos públicos.
+## Verificación
+
+Ejecutar npm ci, npm test, npm run build y npm run check.
+
+Las regresiones antiguas usan migraciones 001–005. tests/production-model.test.mjs ejecuta todas: aislamiento, migración de subcuentas, cinco roles, suspensión, aprobación, invitaciones, pedidos compartidos, inventario privado y administrador verificado.
+
+Se crearon dos organizaciones de prueba en Supabase. scripts/test-hosted-isolation.mjs inicia sesión con dos cuentas sintéticas, consulta PostgREST con cada JWT y comprueba datos propios, cero filas ajenas, denegación de administración global y bloqueo de API entre tenants. El informe sin credenciales está en docs/PRUEBA-AISLAMIENTO-REMOTA.json.
+
+Las credenciales de pruebas permanecen solo en .work/hosted-fixture.json, ignorado por Git. scripts/prepare-hosted-tests.mjs prepara el payload, pero no lo aplica automáticamente. Al finalizar, suspender las organizaciones de prueba sin borrar la evidencia.
+
+Supabase confirmó cero tablas públicas sin RLS. Los avisos SECURITY DEFINER son intencionales: comandos transaccionales que comprueban identidad, rol, estado, tenant y asignación. La tabla privada de activación deniega todo acceso de aplicación y por eso no tiene políticas. Queda como configuración Auth adicional la protección de contraseñas filtradas. [Aviso sobre funciones](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+## Despliegue y límites
+
+Cada bloque se compila, prueba y publica primero en Preview. Verificar health, login, RLS y rechazo anónimo antes de actualizar main. Ante una incidencia mantener la portada y acceso cerrado; nunca restaurar el selector de perfiles de la demo. Respaldar datos antes de nuevas migraciones. No hay pagos ni integraciones comerciales externas.

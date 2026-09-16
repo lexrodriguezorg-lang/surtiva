@@ -18,6 +18,12 @@ test('auth cookies are HttpOnly Secure; responses never expose tokens',async()=>
  assert.equal(result.status,200);assert.deepEqual(result.body,{ok:true});
  for(const cookie of result.headers['Set-Cookie']){assert.match(cookie,/^__Host-surtiva-/);assert.match(cookie,/HttpOnly/);assert.match(cookie,/Secure/);assert.match(cookie,/SameSite=Strict/);}
 });
+
+test('a revoked Supabase session asks for login instead of showing a data error',async()=>{
+ const handler=createHandler({env,fetcher:async()=>new Response(JSON.stringify({code:'session_not_found'}),{status:403})});
+ const result=await call(handler,req('session','GET',undefined,{authorization:'Bearer revoked-session'}));
+ assert.equal(result.status,401);assert.match(result.body.error,/sesión/);
+});
 test('verified session cannot query another tenant or arbitrary table',async()=>{
  const calls=[];const handler=createHandler({env,fetcher:async url=>{
   calls.push(url);if(url.endsWith('/auth/v1/user'))return response({id:ids.owner,email:'owner@example.test',email_confirmed_at:'2026-01-01'});

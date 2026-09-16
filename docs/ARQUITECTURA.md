@@ -11,6 +11,8 @@ Inspección: 16 de septiembre de 2026, antes de implementar persistencia.
 - La carpeta recibida no incluía `.git` ni vínculo `.vercel`. Se recupera el historial sin sustituir los archivos locales.
 - El conector Vercel disponible pertenece a `team_o47X0HA6yrLkFkoRglo0CQNP`, donde solo aparece `agencia-digital-gestion`. SURTIVA no está disponible en ese equipo. No desplegar en ese proyecto ni crear una plataforma distinta por error.
 
+Actualización tras recuperar autenticación CLI: el estado GitHub y Vercel confirman que SURTIVA sí pertenece al mismo equipo; la limitación anterior era del conector. Carpeta vinculada al proyecto **`prj_vwgtk9U2KB6D0Vz1J4F3TG6SNc61`**, nombre `surtiva-o3hj`. El primer preview nuevo quedó Ready y contiene la función `api/[...route]`. No había variables de backend en el proyecto.
+
 ## Arquitectura existente
 
 Aplicación estática sin framework, versión 0.7.0. `index.html` carga `marca.js`, `operacion.js`, `tienda.js` y `arranque.js`. Enrutamiento por hash. El build Node restaura 1.072 fotografías desde dos archivos comprimidos y publica 1.072 productos desde `src/datos/catalogo.json`.

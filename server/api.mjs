@@ -86,6 +86,9 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    }
    const user=await identity(service,token);const ctx=await context(service,token,user);
    if(path==='session'&&req.method==='GET')return reply(200,ctx);
+   if(path==='catalog'&&req.method==='GET') {
+    return reply(200,await service.db('rpc/commercial_catalog',{token,method:'POST',body:{page_offset:Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000))),published_only:url.searchParams.get('published')==='true'}}));
+   }
    if(path.startsWith('admin/data/')&&req.method==='GET') {
     if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
     const resource=path.slice('admin/data/'.length);

@@ -17,3 +17,9 @@
 @media(prefers-reduced-motion:reduce){.entrance-showcase,.showcase-main,.entrance-action{transition:none}}
 
 @media(max-width:680px){.entrance-copy h1{font-size:clamp(43px,11.5vw,70px);letter-spacing:-2.3px;margin:22px 0}.entrance-audience{gap:16px}.entrance-audience button{min-height:44px;font-size:10px}.entrance-copy{padding-top:13px;padding-bottom:25px}}
+/* Keep photography clear of category navigation at every aspect ratio. */
+@media(min-width:1051px){.showcase-main{width:60%;top:14%;left:11%}.showcase-detail{width:29%;right:5%;bottom:25%}}
+.showcase-switches{background:inherit}
+@media(min-width:681px) and (max-width:1050px){.entrance-copy h1{font-size:clamp(44px,5.5vw,62px);letter-spacing:-2.5px}}
+.showcase-switches{left:0;right:0;bottom:0;padding:10px 7% 18px}
+@media(max-width:680px){.showcase-switches{padding:8px 7% 14px}}

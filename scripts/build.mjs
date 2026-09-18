@@ -12,12 +12,14 @@ const out = path.join(root, 'dist');
 await fs.rm(out, { recursive: true, force: true });
 await fs.mkdir(out, { recursive: true });
 await fs.copyFile(path.join(root, 'index.html'), path.join(out, 'index.html'));
+await fs.copyFile(path.join(root, 'commerce.html'), path.join(out, 'commerce.html'));
 
 await fs.mkdir(path.join(out, 'src'), { recursive: true });
-for (const file of ['operacion.css', 'tienda.css', 'plataforma.css', 'brand.css']) {
+for (const file of ['operacion.css', 'tienda.css', 'plataforma.css', 'brand.css', 'brand-tokens.css','commerce.css','visits.css']) {
   await fs.copyFile(path.join(root, 'src', file), path.join(out, 'src', file));
 }
 await build({entryPoints:[path.join(root,'src/plataforma.js')],outfile:path.join(out,'src/plataforma.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true});
+await build({entryPoints:[path.join(root,'src/commerce.js')],outfile:path.join(out,'src/commerce.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true});
 await fs.cp(path.join(root, 'public'), out, { recursive: true });
 
 const packs = ['productos-1.json.gz', 'productos-2.json.gz'];

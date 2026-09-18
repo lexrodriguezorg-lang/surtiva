@@ -3,6 +3,8 @@ const reads=createReadCache();
 import {authenticate,accessToken,supabase} from './auth.js';
 import {readAuthReturn,authMessage,cleanAuthReturn} from './auth-return.js';
 import {landingMarkup,dashboardMarkup,catalogMarkup,scanMarkup,crmMarkup,icons} from './workspace-ui.js';
+import {brand,animateBrand} from './brand.js';
+import {visitWorkspace,handoffLocked,showHandoffLock} from './visits.js';
 let authNotice='';
 let recoveryEmail='';
 let workspaceMode=false,reviewState=null,catalogProducts=[],catalogFilters={query:'',category:'',supplier:'',sort:'name',limit:36},crmProspects=[],crmAgents=[],radarClients=[];
@@ -13,10 +15,9 @@ const app=document.querySelector('#app'),modal=document.querySelector('#modal');
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=value=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)||0);
 const date=value=>value?new Date(value).toLocaleDateString('es-CO'):'—';
-const brand='<span class="brand-lockup"><img class="brand-positive" src="/brand/wordmark.svg" alt="SURTIVA"><img class="brand-negative" src="/brand/wordmark-white.svg" alt="SURTIVA"></span>';
 const roles={distributor_admin:'Distribuidor',seller:'Vendedor',merchant:'Comercio',fulfillment_partner:'Aliado de cumplimiento'};
 const states={pending:'Pendiente',active:'Activo',suspended:'Suspendido',rejected:'Rechazado',aprobacion:'Por aprobar',recibido:'Recibido',preparando:'En preparación',despachado:'En camino',entregado:'Entregado',cancelado:'Cancelado',rechazado:'Rechazado',pendiente:'Pendiente',aprobada:'Aprobada',rechazada:'Rechazada'};
-const sections=[['inicio','Resumen',null],['catalogo','Catálogo','catalog.read'],['inventario','Inventario','inventory.manage'],['clientes','Clientes','customers.read'],['pedidos','Pedidos','orders.read'],['vendedores','Vendedores','team.read'],['proveedores','Proveedores','suppliers.read'],['seguimiento','Seguimiento','followups.manage'],['comisiones','Comisiones','commissions.read'],['cartera','Cartera','receivables.read'],['miinventario','Inventario del comercio','retail.manage'],['ventas','Ventas locales','retail.manage'],['cumplimiento','Cumplimiento','fulfillment.read']];
+const sections=[['inicio','Inicio',null],['catalogo','Catálogo','catalog.read'],['inventario','Inventario','inventory.manage'],['clientes','Clientes','customers.read'],['pedidos','Pedidos','orders.read'],['vendedores','Vendedores','team.read'],['proveedores','Proveedores','suppliers.read'],['seguimiento','Seguimiento','followups.manage'],['comisiones','Comisiones','commissions.read'],['cartera','Cartera','receivables.read'],['miinventario','Inventario del comercio','retail.manage'],['ventas','Ventas locales','retail.manage'],['cumplimiento','Cumplimiento','fulfillment.read']];
 const tableFor={catalogo:'products',inventario:'inventory',clientes:'clients',pedidos:'orders',vendedores:'sellers',proveedores:'suppliers',seguimiento:'followups',comisiones:'commissions',cartera:'invoices',miinventario:'retail_inventory',ventas:'local_sales',cumplimiento:'fulfillment_records'};
 sections.push(['invitaciones','Invitaciones','team.read']);tableFor.invitaciones='invitations';
 sections.push(['puntos','Puntos de cumplimiento','fulfillment.read']);tableFor.puntos='fulfillment_nodes';
@@ -28,6 +29,7 @@ const membership=()=>session?.memberships.find(m=>m.organization_id===organizati
 const currentOrg=()=>session?.organizations.find(o=>o.id===organization);
 const role=()=>reviewState?.role||(session?.isAdmin?'admin':membership()?.role_id);
 const can=permission=>!permission||(!reviewing()&&session?.isAdmin)||session?.permissions.some(p=>p.role_id===role()&&p.permission_id===permission);
+const visits=visitWorkspace({api,allData,session:()=>session,organization:()=>organization,role,readonly:reviewing,dialog,notify,render,clearCache:()=>reads.clear()});
 function notify(message){const box=document.querySelector('#toast');box.textContent=message;box.classList.add('show');setTimeout(()=>box.classList.remove('show'),5000);}
 async function api(path,options={}) {
  const method=options.method||'GET';
@@ -65,7 +67,7 @@ function authPage(register=false){return header()+`<main id="contenido" class="a
 function pending(){if(session?.accountStatus==='suspended')return header()+'<main id="contenido" class="pending"><span class="pill orange">Acceso suspendido</span><h1>Tu organización o membresía está suspendida.</h1><p>Contacta a la administración de Surtiva para revisar el estado de tu acceso.</p><button class="btn light" data-action="logout">Cerrar sesión</button><button class="btn primary" data-action="refresh-session">Consultar estado</button></main>';const rejected=session?.accountStatus==='rejected'||session?.request?.status==='rejected';return `<header class="public-header"><a href="#portada">${brand}</a><button class="btn light" data-action="logout">Cerrar sesión</button></header><main id="contenido" class="pending"><span class="pill orange">${rejected?'Solicitud revisada':'Acceso pendiente'}</span><h1>${rejected?'Tu solicitud no fue aprobada.':'Tu solicitud está en revisión.'}</h1><p>${rejected?'Por ahora tu cuenta no tiene acceso a una organización.':'La verificación de correo y la aprobación de Surtiva son necesarias para habilitar tu espacio.'}</p><button class="btn primary" data-action="refresh-session">Consultar estado</button></main>`;}
 function shell(content,page){
  const owner=ownerMode(),review=reviewing();
- const ownerSections=[['red','Mi gestión'],['catalogo','Catálogo central'],['pedidos','Control de ventas'],['radar','Radar de clientes'],['prospeccion','Prospección'],['clientes','Clientes y comercios'],['vendedores','Equipo de ventas'],['agentes','Agentes y responsables'],['seguimiento','Seguimientos'],['cartera','Cartera'],['proveedores','Proveedores'],['inventario','Inventarios'],['organizaciones','Organizaciones'],['solicitudes','Solicitudes'],['usuarios','Usuarios'],['perfiles','Revisar perfiles']];
+ const ownerSections=[['red','Mi gestión'],['visitas','Visitas comerciales'],['catalogo','Catálogo central'],['pedidos','Control de ventas'],['radar','Radar de clientes'],['prospeccion','Prospección'],['clientes','Clientes y comercios'],['vendedores','Equipo de ventas'],['agentes','Agentes y responsables'],['seguimiento','Seguimientos'],['cartera','Cartera'],['proveedores','Proveedores'],['inventario','Inventarios'],['organizaciones','Organizaciones'],['solicitudes','Solicitudes'],['usuarios','Usuarios'],['perfiles','Revisar perfiles']];
  const nav=owner?ownerSections:sections.filter(x=>can(x[2])).map(([id,label])=>[id,role()==='merchant'&&id==='clientes'?'Mis proveedores':label]);
  return '<div class="shell restored-shell"><button class="menu-scrim" data-action="close-menu" aria-label="Cerrar menú" tabindex="-1"></button><aside class="sidebar" id="workspace-sidebar"><button class="menu-close" data-action="close-menu" aria-label="Cerrar menú">✕</button><a class="logo" href="#'+(session.isAdmin?'red':'inicio')+'" '+(session.isAdmin?'data-action="owner-home"':'')+'>'+brand+'</a>'+(!owner&&!review&&session.organizations.length>1?'<select id="organization" class="tenant-select" aria-label="Organización">'+session.organizations.map(o=>'<option value="'+o.id+'" '+(o.id===organization?'selected':'')+'>'+esc(o.name)+'</option>').join('')+'</select>':'')+'<nav class="navlist workspace-nav" aria-label="Área comercial">'+nav.map(([id,label])=>'<a class="navitem '+(page===id?'active':'')+'" href="#'+id+'"><span aria-hidden="true">'+(icons[id]||'·')+'</span>'+label+'</a>').join('')+'</nav></aside><main class="main" id="contenido"><header class="topbar"><button class="btn light mobile-toggle" data-action="menu" aria-label="Abrir menú" aria-expanded="false" aria-controls="workspace-sidebar">☰</button><strong>'+esc((owner?ownerSections:nav).find(x=>x[0]===page)?.[1]||'Resumen')+'</strong><div class="topbar-actions"><button class="account-avatar" data-action="account" aria-label="Abrir mi perfil">'+avatarMarkup()+'</button></div></header>'+(review?'<div class="review-banner"><strong>Revisión · '+esc(roles[role()])+'</strong><span>'+(reviewState.member?'Datos y permisos del usuario seleccionado. Solo lectura.':reviewState.organization?'Datos reales de la organización. Revisión de distribuidor en solo lectura.':'Vista sin usuario asignado: muestra el estado vacío real de este perfil.')+'</span><button class="btn light small" data-action="owner-home">Salir de revisión</button></div>':'')+'<div class="content">'+content+'</div></main>'+mobileNav(page)+'</div>';
 }
@@ -85,7 +87,7 @@ async function dashboard(){
 }
 async function catalogPage(){
  catalogProducts=await allData('products');rows=catalogProducts;
- return '<div class="catalog-heading"><div><h1>Catálogo</h1><p>Encuentra el próximo producto para tu negocio.</p></div><button class="btn light small presentation-toggle" data-action="present" aria-pressed="false">Modo presentación</button></div><div class="catalog-searchbar"><label class="catalog-search">Buscar<input id="catalog-query" type="search" placeholder="¿Qué producto buscas? Nombre o referencia" value="'+esc(catalogFilters.query)+'"></label><details class="catalog-filter-menu"><summary>Filtros</summary><div><label>Categoría<select id="catalog-category"><option value="">Todas</option>'+[...new Set(catalogProducts.map(p=>p.category))].sort().map(c=>'<option '+(catalogFilters.category===c?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Proveedor<select id="catalog-supplier"><option value="">Todos</option>'+[...new Set(catalogProducts.map(p=>p.organization_id))].map(id=>'<option value="'+id+'" '+(catalogFilters.supplier===id?'selected':'')+'>'+esc(orgName(id))+'</option>').join('')+'</select></label><label>Ordenar<select id="catalog-sort"><option value="name">Nombre A–Z</option><option value="low">Menor precio</option><option value="high">Mayor precio</option></select></label></div></details></div>'+categoryStrip()+'<div id="catalog-results">'+catalogResults()+'</div>'+(!reviewing()&&can('orders.create')?'<button class="catalog-cart-bar" '+(!cart.length?'hidden':'')+' data-action="cart">Revisar pedido ('+cart.length+')</button>':'')+(!reviewing()?managementTools('catalogo'):'');
+ return '<div class="catalog-heading"><div><h1>Catálogo</h1><p>Encuentra el próximo producto para tu negocio.</p></div>'+(!reviewing()&&(session.isAdmin||['seller','distributor_admin'].includes(role()))?'<button class="btn light small" data-action="visit-pick">Mostrar a un comercio</button>':'')+'</div><div class="catalog-searchbar"><label class="catalog-search">Buscar<input id="catalog-query" type="search" placeholder="¿Qué producto buscas? Nombre o referencia" value="'+esc(catalogFilters.query)+'"></label><details class="catalog-filter-menu"><summary>Filtros</summary><div><label>Categoría<select id="catalog-category"><option value="">Todas</option>'+[...new Set(catalogProducts.map(p=>p.category))].sort().map(c=>'<option '+(catalogFilters.category===c?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Proveedor<select id="catalog-supplier"><option value="">Todos</option>'+[...new Set(catalogProducts.map(p=>p.organization_id))].map(id=>'<option value="'+id+'" '+(catalogFilters.supplier===id?'selected':'')+'>'+esc(orgName(id))+'</option>').join('')+'</select></label><label>Ordenar<select id="catalog-sort"><option value="name">Nombre A–Z</option><option value="low">Menor precio</option><option value="high">Mayor precio</option></select></label></div></details></div>'+categoryStrip()+'<div id="catalog-results">'+catalogResults()+'</div>'+(!reviewing()&&can('orders.create')?'<button class="catalog-cart-bar" '+(!cart.length?'hidden':'')+' data-action="cart">Revisar pedido ('+cart.length+')</button>':'')+(!reviewing()?managementTools('catalogo'):'');
 }
 function categoryStrip(){return '<div class="category-strip" role="group" aria-label="Categorías">'+['',...[...new Set(catalogProducts.map(p=>p.category))].sort()].map(c=>'<button data-action="category" data-category="'+esc(c)+'" aria-pressed="'+(catalogFilters.category===c)+'">'+esc(c||'Todo')+'</button>').join('')+'</div>';}
 function catalogResults(){return catalogMarkup(catalogProducts,{...catalogFilters,orgName,owner:ownerMode(),canOrder:can('orders.create'),readonly:reviewing()});}
@@ -120,7 +122,8 @@ async function enrich(page,list){
  if(page==='seguimiento'){const customers=await allData('clients');return list.map(r=>({...r,customerName:customers.find(c=>c.id===r.customer_id)?.name}));}
  return list;
 }
-async function render(){
+async function render(quiet=false){
+ if(handoffLocked()){showHandoffLock(app,render);return;}
  const version=++renderVersion,page=route();modal.close();setMenu(false);
  if(page==='confirmar-correo'){app.innerHTML=confirmationPage();checkConfiguration(version);return;}
  if(page==='activar-administrador'){app.innerHTML=ownerActivationPage();checkConfiguration(version);return;}
@@ -129,12 +132,12 @@ async function render(){
  if(page!=='catalogo')document.body.classList.remove('catalog-presentation');
  if(page==='portada'){app.innerHTML=landing();return;}
  if(['ingresar','acceso','solicitar'].includes(page)){app.innerHTML=authPage(page==='solicitar');checkConfiguration(version);return;}
- if(session){
+ if(session&&!quiet){
   const area=app.querySelector('.content');
   const loading='<div class="route-loading" role="status"><span></span>Cargando sección…</div>';
   if(area){area.innerHTML=loading;const currentLink=app.querySelector('.navitem[href="#'+page+'"]');if(currentLink)app.querySelector('.topbar>strong').textContent=currentLink.textContent.trim();app.querySelectorAll('.navitem').forEach(a=>a.classList.toggle('active',a.hash==='#'+page));}
   else app.innerHTML=shell(loading,page);
- }else app.innerHTML='<div class="boot"><img src="/brand/wordmark.svg" width="170" alt="SURTIVA"><p>Abriendo tu espacio…</p></div>';
+ }else if(!session)app.innerHTML='<div class="boot">'+brand+'<p>Abriendo tu espacio…</p></div>';
  try {
   session=await api('session');if(version!==renderVersion)return;
   if(!session.isAdmin&&!session.memberships.length){app.innerHTML=pending();return;}
@@ -150,7 +153,9 @@ async function render(){
   else if(page==='agentes'&&ownerMode())content=await agentsPage();
   else if(page==='catalogo'&&can('catalog.read'))content=await catalogPage();
   else if(page==='solicitudes'&&session.isAdmin){const requests=await api('admin/requests');if(version!==renderVersion)return;rows=requests;content=title('Solicitudes de acceso.','La aprobación define organización, rol y asignaciones. El correo debe estar verificado.')+`<div class="panel">${rows.map(r=>`<article class="access-row"><div><h3>${esc(r.profiles?.name||'Solicitante')}</h3><p>${esc(r.organization_name)} · ${esc(roles[r.requested_role])}</p>${badge(r.status)}</div>${r.status==='pending'?`<button class="btn primary small" data-action="review" data-id="${r.id}">Revisar solicitud</button>`:''}</article>`).join('')||'<div class="empty-state">No hay solicitudes.</div>'}</div>`;}
+  else if((page==='inicio'&&role()==='seller')||(page==='visitas'&&(session.isAdmin||['seller','distributor_admin'].includes(role()))))content=await visits.page();
   else if(page==='inicio')content=(organization||reviewing()||ownerMode())?await dashboard():title('Tu red está lista para crecer.','Revisa las solicitudes para incorporar organizaciones.');
+  else if(page==='clientes'&&(session.isAdmin||role()==='seller'||role()==='distributor_admin'))content=await visits.page();
   else if((page==='usuarios'&&session.isAdmin)||sections.some(s=>s[0]===page&&can(s[2]))){
    if(!organization&&!ownerMode()&&!reviewing())throw Error('Primero selecciona o crea una organización.');
    const raw=await data(page==='usuarios'?'memberships':tableFor[page],'?offset='+offset);const enriched=await enrich(page,raw);if(version!==renderVersion)return;rows=enriched;
@@ -228,6 +233,7 @@ document.addEventListener('click',async event=>{
  if(reviewing()&&!['owner-home','logout','menu','close-menu','account','category','present','close','previous','next','product-detail','catalog-more','order'].includes(action)){notify('Vista de revisión: vuelve a tu gestión para hacer cambios.');button.disabled=false;return;}
  if(ownerMode()){const row=rows.find(r=>r.id===id||r.product_id===id);if(row?.organization_id)organization=row.organization_id;}
  try {
+  if(await visits.action(action,button))return;
   if(action==='account')accountDialog();
   if(action==='logout'){workspaceMode=false;reviewState=null;await api('auth/logout',{method:'POST',body:{}});session=null;organization='';cart=[];rows=[];location.hash='portada';await render();}
   if(action==='owner-home'){workspaceMode=false;reviewState=null;organization='';cart=[];location.hash='red';await render();}
@@ -269,6 +275,7 @@ document.addEventListener('submit',async event=>{
  event.preventDefault();const form=event.target,fields=Object.fromEntries(new FormData(form)),button=event.submitter,feedback=form.querySelector('.form-feedback')||modal.querySelector('.form-feedback');
  if(button)button.disabled=true;if(feedback)feedback.innerHTML='';
  try{
+  if(await visits.submit(form,fields))return;
   if(ownerMode()&&fields.organizationContext)organization=fields.organizationContext;
   if(form.id==='profile-photo')await saveProfilePhoto(fields.photo);
   if(form.id==='edit-product'){await api(scoped('products'),{method:'PATCH',body:{id:form.dataset.id,title:fields.title,category:fields.category,price:Number(fields.price),active:fields.active==='true'}});modal.close();await render();notify('Producto actualizado');}
@@ -323,7 +330,16 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('input',event=>{if(event.target.id==='catalog-query'){catalogFilters.query=event.target.value;catalogFilters.limit=36;refreshCatalog();return;}if(event.target.id==='search'){const query=event.target.value.toLocaleLowerCase('es');document.querySelector('#data-list').innerHTML=tableView(route(),rows.filter(r=>Object.values(r).some(v=>String(v).toLocaleLowerCase('es').includes(query))));}});
 window.addEventListener('hashchange',()=>{authNotice='';offset=0;render();window.scrollTo(0,0);});
 window.addEventListener('pageshow',event=>{if(event.persisted)render();});
+window.addEventListener('focus',()=>{reads.clear();});
+let orderWatch='',watchingOrders=false;
+async function watchOrders(){
+ if(watchingOrders||!session||reviewing()||handoffLocked()||document.hidden||modal.open||document.body.classList.contains('menu-is-open')||!['inicio','visitas','pedidos'].includes(route())||!can('orders.read')||document.activeElement?.matches('input,textarea,select'))return;
+ watchingOrders=true;try{const list=await request(ownerMode()?'admin/data/orders':scoped('data/orders'));const next=JSON.stringify(list.map(o=>[o.id,o.status,o.total]));if(orderWatch&&next!==orderWatch){reads.clear();await render(true);notify('Tus pedidos se actualizaron');}orderWatch=next;}catch{}finally{watchingOrders=false;}
+}
+setInterval(watchOrders,20000);
+
 async function start(){
+ animateBrand();
  const returned=readAuthReturn(location.href);
  if(returned){
   let page=returned.recovery?'nueva-clave':'ingresar';
@@ -332,6 +348,7 @@ async function start(){
   history.replaceState(null,'',cleanAuthReturn(location.href,page));
  }
  await render();
+ watchOrders();
 }
 start();
 

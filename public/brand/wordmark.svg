@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 326 58" role="img" aria-label="SURTIVA">
-<g fill="#0E1B2E">
-<path d="M46 7H17C6 7 1 13 1 22s6 14 16 14h13c3 0 4 1 4 3s-1 3-4 3H2v10h30c11 0 16-6 16-15s-6-13-16-13H19c-3 0-4-1-4-3s1-3 4-3h27Z"/>
-<path d="M52 7h13v27c0 6 3 8 10 8s10-2 10-8V7h13v28c0 12-7 18-23 18s-23-6-23-18Z"/>
-<path fill-rule="evenodd" d="M103 7h31c13 0 20 5 20 16 0 8-4 12-11 14l14 15h-17l-17-19h-7v19h-13Zm13 11v10h17c5 0 8-1 8-5s-3-5-8-5Z"/>
-<path d="M157 7h46v12h-17v33h-13V19h-16ZM207 7h13v45h-13ZM224 7h14l15 30 15-30h15l-24 45h-13ZM295 7h12l19 45h-14l-11-29-16 29h-15Z"/>
-</g><circle cx="298" cy="46" r="6" fill="#F25C3A"/></svg>

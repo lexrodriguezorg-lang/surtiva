@@ -4,6 +4,8 @@
   "buildCommand": "npm run build && npm run check",
   "outputDirectory": "dist",
   "rewrites": [
+    {"source":"/c","destination":"/commerce.html"},
+    {"source":"/c/","destination":"/commerce.html"},
     {
       "source": "/api/:path*",
       "destination": "/api?_route=:path*"

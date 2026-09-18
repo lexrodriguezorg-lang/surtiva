@@ -64,6 +64,12 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    }
    if(path==='health'&&req.method==='GET') {return reply(200,{configured:!!(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY),version:'0.9.0'});}
    if(path==='config'&&req.method==='GET') {const {url,key}=config(env);return reply(200,{url,publishableKey:key});}
+   if(path==='commercial/portal'&&req.method==='POST') {
+    const secret=text(body.token,96,96);if(!/^[a-f0-9]{96}$/.test(secret))throw new HttpError(403,'Este enlace no está disponible. Solicita uno nuevo a tu vendedor.');
+    if(!['catalog','preferences','orders','quote','order'].includes(body.operation))throw new HttpError(400,'Operación inválida.');
+    res.setHeader('Referrer-Policy','no-referrer');
+    return reply(200,await backend({env,fetcher}).db('rpc/commercial_portal',{method:'POST',body:{secret,operation:body.operation,payload:body.payload||{}}}));
+   }
    // Reject private requests before contacting an unavailable backend.
    if(!path.startsWith('auth/')&&!token)throw new HttpError(401,'Ingresa para continuar.');
    const service=backend({env,fetcher});
@@ -144,6 +150,19 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    const membership=ctx.memberships.find(m=>m.organization_id===org);
    if(!ctx.organizations.some(o=>o.id===org)||(!ctx.isAdmin&&!membership))throw new HttpError(403,'No tienes acceso a esta organización.');
    const can=permission=>ctx.isAdmin||ctx.permissions.some(p=>p.role_id===membership.role_id&&p.permission_id===permission);
+   if(path.startsWith('commercial/')&&!ctx.isAdmin&&!['distributor_admin','seller'].includes(membership?.role_id))throw new HttpError(403,'No autorizado.');
+   if(path==='commercial/preregister'&&req.method==='POST') {
+    return reply(201,await service.db('rpc/preregister_merchant',{token,method:'POST',body:{org,payload:{name:text(body.name,1,120),contact:text(body.contact,1,100),phone:text(body.phone,7,24),city:text(body.city,1,100),sellerId:body.sellerId?validId(body.sellerId):null}}}));
+   }
+   if(path==='commercial/access'&&req.method==='POST') {
+    return reply(201,await service.db('rpc/create_commercial_access',{token,method:'POST',body:{org,client_key:validId(body.clientId),options:body.options||{}}}));
+   }
+   if(path==='commercial/accesses'&&req.method==='GET') {
+    return reply(200,await service.db('commercial_accesses?select=id,client_id,status,created_at,expires_at,last_access_at,access_count,categories,product_ids&organization_id=eq.'+org+'&client_id=eq.'+validId(url.searchParams.get('client'))+'&order=created_at.desc&limit=30',{token}));
+   }
+   if(path==='commercial/revoke'&&req.method==='POST') {
+    await service.db('rpc/revoke_commercial_access',{token,method:'POST',body:{access_key:validId(body.id)}});return reply(200,{ok:true});
+   }
    if(path==='products'&&req.method==='PATCH') {
     if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
     if(!Number.isFinite(body.price)||body.price<0||typeof body.active!=='boolean')throw new HttpError(400,'Precio o estado inválido.');

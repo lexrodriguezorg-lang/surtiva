@@ -40,12 +40,18 @@ test('shared selections, expirations, suspended issuers, stock and snapshot chan
   await fixture(db);await migrate(db);await db.exec(`insert into public.catalog_publications(organization_id,product_id) values('${ids.org}','${ids.product}'),('${ids.org}','${ids.product3}');`);
   const a=await asUser(db,'seller',async()=>(await db.query('select public.create_commercial_access($1,$2,$3) d',[ids.org,ids.customer,JSON.stringify({products:[ids.product]})])).rows[0].d);
   await visitor(db,async()=>{assert.deepEqual((await call(db,a.token)).products.map(p=>p.id),[ids.product]);await assert.rejects(call(db,a.token,'quote',{items:[{productId:ids.product3,quantity:1}]}));await assert.rejects(call(db,a.token,'quote',{items:[{productId:ids.product,quantity:101}]}));});
+  await visitor(db,async()=>{await call(db,a.token,'preferences',{interests:['Hogar','No autorizada']});assert.deepEqual((await call(db,a.token)).interests,['Hogar']);});
   const q=await visitor(db,()=>call(db,a.token,'quote',{items:[{productId:ids.product,quantity:1}]}));
+  const sameTenant=await asUser(db,'owner',async()=>(await db.query('select public.create_commercial_access($1,$2,$3) d',[ids.org,ids.customer2,JSON.stringify({products:[ids.product3]})])).rows[0].d);
+  await visitor(db,async()=>{assert.deepEqual((await call(db,sameTenant.token)).products.map(p=>p.id),[ids.product3]);await assert.rejects(call(db,sameTenant.token,'order',{quoteId:q.id,requestKey:ids.order}));});
   await db.query('update public.products set price=900 where id=$1',[ids.product]);
   const o=await visitor(db,()=>call(db,a.token,'order',{quoteId:q.id,requestKey:ids.order}));assert.equal(o.total,127);
   const q2=await visitor(db,()=>call(db,a.token,'quote',{items:[{productId:ids.product,quantity:1}]}));await db.query("update public.commercial_quotes set expires_at=now()-interval '1 second' where id=$1",[q2.id]);
   await visitor(db,()=>assert.rejects(call(db,a.token,'order',{quoteId:q2.id,requestKey:ids.order2})));
   await db.query("update public.memberships set status='suspended' where user_id=$1",[ids.seller]);await visitor(db,()=>assert.rejects(call(db,a.token)));
-  await db.query("update public.memberships set status='active' where user_id=$1",[ids.seller]);await db.query("update public.organizations set status='suspended' where id=$1",[ids.org]);await visitor(db,()=>assert.rejects(call(db,a.token)));
+  await db.query("update public.memberships set status='active' where user_id=$1",[ids.seller]);
+  await db.query("update public.commercial_accesses set expires_at=now()-interval '1 second' where id=$1",[a.id]);await visitor(db,()=>assert.rejects(call(db,a.token)));
+  await db.query("update public.commercial_accesses set expires_at=now()+interval '1 day' where id=$1",[a.id]);
+  await db.query("update public.organizations set status='suspended' where id=$1",[ids.org]);await visitor(db,()=>assert.rejects(call(db,a.token)));
  }finally{await db.close();}
 });

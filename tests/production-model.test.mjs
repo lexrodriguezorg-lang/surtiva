@@ -123,6 +123,8 @@ test('orders shared with assigned organizations keep merchant inventory and sale
  await fixture(db);await migrate(db);
  const key='90000000-0000-4000-8000-000000000099';
  const order=await asUser(db,'shop',async()=>(await db.query('select public.create_order($1,$2,$3,$4) id',[ids.org,ids.customer,JSON.stringify([{productId:ids.product,quantity:2}]),key])).rows[0].id);
+ await asUser(db,'admin',()=>db.query("select public.act_on_order($1,1,'authorize','{}')",[order]));
+ await asUser(db,'owner',()=>db.query("select public.act_on_order($1,2,'confirm_availability',$2)",[order,JSON.stringify({items:[{productId:ids.product,stock:100}]})]));
  await asUser(db,'owner',async()=>{
   await db.query('select public.assign_fulfillment($1,$2,$3)',[ids.org,order,ids.point]);
   await db.query("select public.transition_order($1,$2,'preparando')",[ids.org,order]);

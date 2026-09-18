@@ -66,7 +66,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    if(path==='config'&&req.method==='GET') {const {url,key}=config(env);return reply(200,{url,publishableKey:key});}
    if(path==='commercial/portal'&&req.method==='POST') {
     const secret=text(body.token,96,96);if(!/^[a-f0-9]{96}$/.test(secret))throw new HttpError(403,'Este enlace no está disponible. Solicita uno nuevo a tu vendedor.');
-    if(!['catalog','preferences','orders','quote','order'].includes(body.operation))throw new HttpError(400,'Operación inválida.');
+    if(!['catalog','preferences','orders','quote','order','edit_order'].includes(body.operation))throw new HttpError(400,'Operación inválida.');
     res.setHeader('Referrer-Policy','no-referrer');
     return reply(200,await backend({env,fetcher}).db('rpc/commercial_portal',{method:'POST',body:{secret,operation:body.operation,payload:body.payload||{}}}));
    }
@@ -100,6 +100,11 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    const user=await identity(service,token);const ctx=await context(service,token,user);
    if(path==='session'&&req.method==='GET')return reply(200,{...ctx,preview:env.VERCEL_ENV==='preview'});
    if(env.VERCEL_ENV==='preview'&&req.method!=='GET'&&!path.startsWith('commercial/'))throw new HttpError(403,'Este preview permite probar visitas y pedidos con organizaciones de prueba. Los demás cambios se realizan en producción.');
+   if(path==='orders/detail'&&req.method==='GET')return reply(200,await service.db('rpc/order_workspace',{token,method:'POST',body:{order_key:validId(url.searchParams.get('id'))}}));
+   if(path==='orders/action'&&req.method==='POST'){
+    if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new HttpError(400,'Versión de pedido inválida.');
+    return reply(200,await service.db('rpc/act_on_order',{token,method:'POST',body:{order_key:validId(body.id),expected_revision:body.revision,operation:text(body.operation,1,40),payload:body.payload||{}}}));
+   }
    if(path==='catalog'&&req.method==='GET') {
     return reply(200,await service.db('rpc/commercial_catalog',{token,method:'POST',body:{page_offset:Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000))),published_only:url.searchParams.get('published')==='true'}}));
    }

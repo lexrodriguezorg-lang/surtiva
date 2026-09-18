@@ -4,8 +4,14 @@
   "buildCommand": "npm run build && npm run check",
   "outputDirectory": "dist",
   "rewrites": [
-    {"source":"/c","destination":"/commerce.html"},
-    {"source":"/c/","destination":"/commerce.html"},
+    {
+      "source": "/c",
+      "destination": "/commerce.html"
+    },
+    {
+      "source": "/c/",
+      "destination": "/commerce.html"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api?_route=:path*"
@@ -39,6 +45,15 @@
         {
           "key": "Cache-Control",
           "value": "private, no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/assets/productos/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     }

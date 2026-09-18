@@ -1,8 +1,8 @@
 import {brand,animateBrand} from './brand.js';
 const collections=[
- {name:'Juguetería',image:'j-6688-1a.webp',alt:'Bloques didácticos de colores',color:'toys',next:'h-dk-6395.webp'},
+ {name:'Juguetería',image:'j-6688-1a.webp',alt:'Bloques didácticos de colores',color:'toys',next:'h-dk-4589.webp'},
  {name:'Belleza',image:'bbr-dk-3565.webp',alt:'Set de brochas con espejo',color:'beauty',next:'j-6688-1a.webp'},
- {name:'Hogar',image:'h-dk-6395.webp',alt:'Termos de colores pastel',color:'home',next:'bbr-dk-3565.webp'}
+ {name:'Hogar',image:'h-dk-4589.webp',alt:'Relojes despertadores de elefante',color:'home',next:'bbr-dk-3565.webp'}
 ];
 const profiles={
  merchant:{text:'Encuentra surtido para tu tienda. Arma tu pedido y sigue vendiendo.',cta:'Solicitar acceso'},

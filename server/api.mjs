@@ -90,6 +90,9 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     try {const session=await service.auth('token?grant_type=refresh_token',{method:'POST',body:{refresh_token:refresh}});setSession(res,session,secure);return reply(200,{ok:true});}
     catch(error){setSession(res,null,secure);throw error;}
    }
+   // PostgreSQL verifies approved membership and catalogue publication in this RPC.
+   // Avoid loading the entire workspace context for each page of products.
+   if(path==='catalog/browse'&&req.method==='GET')return reply(200,await service.db('rpc/browse_catalog',{token,method:'POST',body:{options:Object.fromEntries(url.searchParams)}}));
    const user=await identity(service,token);const ctx=await context(service,token,user);
    if(path==='session'&&req.method==='GET')return reply(200,{...ctx,preview:env.VERCEL_ENV==='preview'});
    if(env.VERCEL_ENV==='preview'&&req.method!=='GET'&&!path.startsWith('commercial/'))throw new HttpError(403,'Este preview permite probar visitas y pedidos con organizaciones de prueba. Los demás cambios se realizan en producción.');

@@ -91,7 +91,8 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     catch(error){setSession(res,null,secure);throw error;}
    }
    const user=await identity(service,token);const ctx=await context(service,token,user);
-   if(path==='session'&&req.method==='GET')return reply(200,ctx);
+   if(path==='session'&&req.method==='GET')return reply(200,{...ctx,preview:env.VERCEL_ENV==='preview'});
+   if(env.VERCEL_ENV==='preview'&&req.method!=='GET'&&!path.startsWith('commercial/'))throw new HttpError(403,'Este preview permite probar visitas y pedidos con organizaciones de prueba. Los demás cambios se realizan en producción.');
    if(path==='catalog'&&req.method==='GET') {
     return reply(200,await service.db('rpc/commercial_catalog',{token,method:'POST',body:{page_offset:Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000))),published_only:url.searchParams.get('published')==='true'}}));
    }
@@ -100,7 +101,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     const resource=path.slice('admin/data/'.length);
     if(!['products','inventory','orders','order_items','order_events','clients','sellers','suppliers','invoices','commissions','followups','memberships','commercial_agents','prospects'].includes(resource))throw new HttpError(403,'Recurso no disponible.');
     const offset=Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000)));
-    const orgs=ctx.organizations.filter(o=>!o.is_test).map(o=>validId(o.id));
+    const orgs=ctx.organizations.filter(o=>env.VERCEL_ENV==='preview'&&url.searchParams.get('test')==='true'?o.is_test:!o.is_test).map(o=>validId(o.id));
     const global=['commercial_agents','prospects'].includes(resource);
     if(!global&&!orgs.length)return reply(200,[]);
     const order=resource==='inventory'?'product_id':resource==='products'?'sku,id':'id';
@@ -151,6 +152,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    if(!ctx.organizations.some(o=>o.id===org)||(!ctx.isAdmin&&!membership))throw new HttpError(403,'No tienes acceso a esta organización.');
    const can=permission=>ctx.isAdmin||ctx.permissions.some(p=>p.role_id===membership.role_id&&p.permission_id===permission);
    if(path.startsWith('commercial/')&&!ctx.isAdmin&&!['distributor_admin','seller'].includes(membership?.role_id))throw new HttpError(403,'No autorizado.');
+   if(path.startsWith('commercial/')&&env.VERCEL_ENV==='preview'&&req.method!=='GET'&&!ctx.organizations.find(o=>o.id===org)?.is_test)throw new HttpError(403,'Usa una organización de prueba para esta revisión.');
    if(path==='commercial/preregister'&&req.method==='POST') {
     return reply(201,await service.db('rpc/preregister_merchant',{token,method:'POST',body:{org,payload:{name:text(body.name,1,120),contact:text(body.contact,1,100),phone:text(body.phone,7,24),city:text(body.city,1,100),sellerId:body.sellerId?validId(body.sellerId):null}}}));
    }
@@ -161,6 +163,8 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     return reply(200,await service.db('commercial_accesses?select=id,client_id,status,created_at,expires_at,last_access_at,access_count,categories,product_ids&organization_id=eq.'+org+'&client_id=eq.'+validId(url.searchParams.get('client'))+'&order=created_at.desc&limit=30',{token}));
    }
    if(path==='commercial/revoke'&&req.method==='POST') {
+    const access=await service.db('commercial_accesses?select=id&organization_id=eq.'+org+'&id=eq.'+validId(body.id),{token});
+    if(!access.length)throw new HttpError(404,'Enlace no encontrado en esta organización.');
     await service.db('rpc/revoke_commercial_access',{token,method:'POST',body:{access_key:validId(body.id)}});return reply(200,{ok:true});
    }
    if(path==='products'&&req.method==='PATCH') {

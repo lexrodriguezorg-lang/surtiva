@@ -22,14 +22,14 @@ await build({entryPoints:[path.join(root,'src/plataforma.js')],outfile:path.join
 await build({entryPoints:[path.join(root,'src/commerce.js')],outfile:path.join(out,'src/commerce.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true});
 await fs.cp(path.join(root, 'public'), out, { recursive: true });
 
-const packs = ['productos-1.json.gz', 'productos-2.json.gz'];
+const packs = (await fs.readdir(path.join(root,'assets-packs'))).filter(f=>/^(productos|originals)-[0-9]+\.json\.gz$/.test(f)).sort();
 let restored = 0;
 for (const pack of packs) {
   const zipped = await fs.readFile(path.join(root, 'assets-packs', pack));
   const assetMap = JSON.parse(gunzipSync(zipped).toString('utf8'));
   for (const [rel, b64] of Object.entries(assetMap)) {
     const dest = path.join(out, rel);
-    if (!dest.startsWith(out + path.sep) || !/^assets\/productos\/[a-zA-Z0-9_.-]+$/.test(rel)) throw Error('Ruta de imagen inválida');
+    if (!dest.startsWith(out + path.sep) || !/^assets\/productos(?:-hd)?\/[a-zA-Z0-9_.-]+$/.test(rel)) throw Error('Ruta de imagen inválida');
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, Buffer.from(b64, 'base64'));
     restored++;

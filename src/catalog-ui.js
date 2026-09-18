@@ -1,15 +1,20 @@
 import {esc,safeImage,categoryStyle} from './commerce-ui.js';
-
+import {photoAttributes} from './product-photos.js';
+const actionFor=mode=>mode==='workspace'?'data-action="category"':'data-shop="category"';
+const images=c=>[...new Set(c.images?.filter(Boolean)||[c.image])].slice(0,3);
+const ordered=categories=>categories.slice().sort((a,b)=>{const rank=n=>/grande/i.test(n)?0:/belleza/i.test(n)?1:/hogar/i.test(n)?2:3;return rank(a.name)-rank(b.name)||a.name.localeCompare(b.name,'es');});
+export function categoryBanners(categories,mode='shop'){
+ const list=ordered(categories).filter(c=>c.image).slice(0,6);if(!list.length)return '';
+ return `<section class="catalog-stories" aria-label="Descubre nuestras categorías" aria-roledescription="carrusel" data-current="0"><div class="story-window">${list.map((c,i)=>`<article class="catalog-story ${categoryStyle(c.name)}" ${i?'hidden':''}><div class="story-copy"><span>ABRE UN MUNDO DE POSIBILIDADES</span><h2>${esc(c.name)}</h2><p>${Number(c.count)} referencias para tu negocio</p><button ${actionFor(mode)} data-category="${esc(c.name)}">Explorar categoría <span aria-hidden="true">↗</span></button></div><div class="story-photos">${images(c).slice(0,2).map((im,j)=>`<img src="${safeImage(im)}" ${photoAttributes(im,'(max-width: 680px) 85vw, 550px')} alt="Selección de ${esc(c.name)}" width="1024" height="1024" loading="${i?'lazy':'eager'}" ${!i&&!j?'fetchpriority="high"':''} data-product-image>`).join('')}</div></article>`).join('')}</div><div class="story-controls"><div>${list.map((c,i)=>`<button data-story-index="${i}" aria-label="Mostrar ${esc(c.name)}" aria-pressed="${i===0}"><span></span></button>`).join('')}</div><button class="story-pause" data-story-pause aria-pressed="false" aria-label="Pausar banners">Ⅱ</button></div></section>`;
+}
 export function categoryGallery(categories,selected='',mode='shop'){
  if(!categories.length)return '';
- const action=mode==='workspace'?'data-action="category"':'data-shop="category"';
- return `<section class="category-browser ${selected?'compact':''}" aria-label="Comprar por categoría"><div class="category-browser-title"><h2>Compra por categoría</h2><span>${categories.length} mundos por descubrir</span></div><div class="category-gallery">${categories.map(c=>`<button class="category-photo ${categoryStyle(c.name)}" ${action} data-category="${esc(c.name)}" aria-pressed="${selected===c.name}"><span class="category-image"><img src="${safeImage(c.image)}" alt="" width="180" height="180" loading="lazy" decoding="async" data-product-image></span><span class="category-caption"><b>${esc(c.name)}</b><small>${Number(c.count)||0} productos <span aria-hidden="true">↗</span></small></span></button>`).join('')}</div></section>`;
+ if(selected)return `<div class="catalog-breadcrumb"><button ${actionFor(mode)} data-category="">← Categorías</button><span>/</span><b>${esc(selected)}</b></div>`;
+ return `<section class="category-browser" aria-label="Comprar por categoría"><div class="category-browser-title"><h2>¿Qué quieres surtir?</h2><span>Elige un catálogo</span></div><div class="category-gallery">${ordered(categories).map((c,i)=>`<button class="category-photo ${categoryStyle(c.name)}" ${actionFor(mode)} data-category="${esc(c.name)}"><span class="category-image"><img src="${safeImage(c.image)}" ${photoAttributes(c.image,'(max-width: 680px) 48vw, 380px')} alt="" width="1024" height="1024" loading="lazy" decoding="async" data-product-image></span><span class="category-caption"><small>CATÁLOGO ${String(i+1).padStart(2,'0')}</small><b>${esc(c.name)}</b><small>${Number(c.count)||0} productos <span aria-hidden="true">Abrir ↗</span></small></span></button>`).join('')}</div></section>`;
 }
-
-// Missing photographs never remain as an endless blank or broken-image icon.
+function showStory(root,index){const slides=[...root.querySelectorAll('.catalog-story')];slides.forEach((s,i)=>s.hidden=i!==index);root.dataset.current=index;root.querySelectorAll('[data-story-index]').forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));}
 export function installImageRecovery(){
- document.addEventListener('error',event=>{
-  const img=event.target;if(!(img instanceof HTMLImageElement)||!img.hasAttribute('data-product-image'))return;
-  img.hidden=true;const note=document.createElement('span');note.className='photo-unavailable';note.textContent='Fotografía no disponible';img.after(note);
- },true);
+ document.addEventListener('error',event=>{const img=event.target;if(!(img instanceof HTMLImageElement)||!img.hasAttribute('data-product-image'))return;img.hidden=true;const note=document.createElement('span');note.className='photo-unavailable';note.textContent='Fotografía no disponible';img.after(note);},true);
+ document.addEventListener('click',event=>{const b=event.target.closest('[data-story-index],[data-story-pause]');if(!b)return;const root=b.closest('.catalog-stories');if(b.hasAttribute('data-story-index'))showStory(root,Number(b.dataset.storyIndex));else{root.dataset.paused=String(root.dataset.paused!=='true');b.setAttribute('aria-pressed',root.dataset.paused);b.setAttribute('aria-label',root.dataset.paused==='true'?'Reanudar banners':'Pausar banners');b.textContent=root.dataset.paused==='true'?'▷':'Ⅱ';}});
+ setInterval(()=>{if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.querySelectorAll('.catalog-stories').forEach(root=>{if(root.dataset.paused==='true'||root.matches(':hover,:focus-within')||root.getBoundingClientRect().bottom<0)return;showStory(root,(Number(root.dataset.current)+1)%root.querySelectorAll('.catalog-story').length);});},6500);
 }

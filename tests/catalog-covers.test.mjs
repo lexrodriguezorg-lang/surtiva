@@ -1,0 +1,11 @@
+import test from 'node:test';import {database,fixture,migrate,asUser,ids,assert} from './database.mjs';
+import {categoryGallery,categoryBanners} from '../src/catalog-ui.js';
+test('catalogue covers choose editorial photos only from authorized products and preserve paging',async()=>{const db=await database();try{await fixture(db);await migrate(db);
+ await db.query("update public.products set image='assets/productos/allowed.webp',showcase_rank=20 where id=$1",[ids.product]);
+ await db.query("update public.products set image='assets/productos/featured.webp',showcase_rank=1 where id=$1",[ids.product3]);
+ await db.query("update public.products set image='assets/productos/other-private.webp',showcase_rank=0 where id=$1",[ids.product2]);
+ const browse=()=>db.query("select public.browse_catalog('{\"limit\":1,\"category\":\"Hogar\"}') d");
+ const owner=await asUser(db,'owner',async()=>(await browse()).rows[0].d);assert.equal(owner.products[0].id,ids.product3);assert.equal(owner.hasMore,true);assert.equal(owner.categories[0].image,'assets/productos/featured.webp');assert(!JSON.stringify(owner).includes('other-private'));
+ const seller=await asUser(db,'seller',async()=>(await browse()).rows[0].d);assert.equal(seller.products[0].id,ids.product);assert.deepEqual(seller.categories[0].images,['assets/productos/allowed.webp']);
+ const gallery=categoryGallery(owner.categories);assert.match(gallery,/Elige un catálogo/);assert.match(categoryGallery(owner.categories,'Hogar'),/← Categorías/);assert.match(categoryBanners(owner.categories),/data-story-pause/);
+}finally{await db.close()}});

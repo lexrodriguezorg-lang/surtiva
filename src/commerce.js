@@ -22,7 +22,7 @@ function sheet(title,content){modal.innerHTML=`<header><h2>${esc(title)}</h2><bu
 async function loadCatalog(append=false){
  const version=++loadVersion;busy=true;
  try{
- const parameters={query,category,offset,sort,replenish,personalized:view==='home'};const data=await catalogReads.read(JSON.stringify(parameters),()=>api('catalog',parameters));if(version!==loadVersion)return;info=data;data.products.forEach(p=>products.set(p.id,p));
+ const parameters={query,category,offset,sort,replenish,personalized:view==='home'};const data=await catalogReads.read(JSON.stringify(parameters),()=>api('catalog',parameters));if(version!==loadVersion)return;info=data;data.categories=data.categories.map(c=>({...c,preferred:data.interests.includes(c.name)}));data.products.forEach(p=>products.set(p.id,p));
  if(!append){
  if(view==='home'){
   layout(categoryBanners(data.categories)+'<section class="shop-section">'+categoryGallery(data.categories)+'</section>');

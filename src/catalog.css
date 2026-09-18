@@ -17,3 +17,7 @@
 #catalog-results{scroll-margin-top:84px}.catalog-breadcrumb{scroll-margin-top:84px}
 
 @media(max-width:680px){.story-photos{height:220px}.story-copy{padding:18px}.story-copy>span{display:none}.story-copy h2{font-size:28px;margin:0}.story-copy button{margin-top:12px}.catalog-heading{margin-bottom:18px}}
+
+.catalog-searchbar[data-category-entry] .sort-order{display:none}
+
+.category-photo,.catalog-breadcrumb button{scroll-margin-block:84px}

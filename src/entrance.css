@@ -23,3 +23,5 @@
 @media(min-width:681px) and (max-width:1050px){.entrance-copy h1{font-size:clamp(44px,5.5vw,62px);letter-spacing:-2.5px}}
 .showcase-switches{left:0;right:0;bottom:0;padding:10px 7% 18px}
 @media(max-width:680px){.showcase-switches{padding:8px 7% 14px}}
+
+.entrance-pause{position:absolute;z-index:3;top:20px;right:20px;min-width:38px;min-height:38px;border:1px solid #ffffff45;border-radius:50%;background:#08223d;color:white;cursor:pointer}

@@ -22,7 +22,7 @@ export function entranceMarkup(){return `<div class="surtiva-entrance">
    <a class="entrance-action" href="?profile=merchant#solicitar"><span>Solicitar acceso</span>${arrow}</a>
   </section>
   <section class="entrance-showcase toys" aria-label="Una mirada al surtido de SURTIVA">
-   <div class="showcase-orbit" aria-hidden="true"></div><span class="showcase-note">ENCUENTRA TU PRÓXIMO ÉXITO</span>
+   <button class="entrance-pause" data-collection-pause aria-label="Pausar categorías" aria-pressed="false">Ⅱ</button><div class="showcase-orbit" aria-hidden="true"></div><span class="showcase-note">ENCUENTRA TU PRÓXIMO ÉXITO</span>
    <figure class="showcase-main"><img src="/assets/productos/${collections[0].image}" ${photoAttributes("assets/productos/"+collections[0].image,"(max-width: 680px) 85vw, 600px")} alt="${collections[0].alt}" fetchpriority="high" width="384" height="384"><figcaption><span>Juguetería</span><b>01 / 03</b></figcaption></figure>
    <figure class="showcase-detail" aria-hidden="true"><img src="/assets/productos/${collections[0].next}" alt="" width="384" height="384"><span>Y mucho más ↗</span></figure>
    <svg class="showcase-wave" viewBox="0 0 700 180" preserveAspectRatio="none" aria-hidden="true"><path d="M-30 158C170-30 300 240 730 30" fill="none" stroke="currentColor" stroke-width="42"/></svg>
@@ -34,9 +34,10 @@ export function entranceMarkup(){return `<div class="surtiva-entrance">
 document.addEventListener('click',event=>{
  const profile=event.target.closest('[data-audience]');
  if(profile){const selected=profiles[profile.dataset.audience];document.querySelectorAll('[data-audience]').forEach(b=>b.setAttribute('aria-pressed',String(b===profile)));document.querySelector('.entrance-invitation').textContent=selected.text;const link=document.querySelector('.entrance-action');link.href='?profile='+profile.dataset.audience+'#solicitar';link.querySelector('span').textContent=selected.cta;}
+ const pause=event.target.closest('[data-collection-pause]');if(pause){const active=pause.getAttribute('aria-pressed')==='true';pause.setAttribute('aria-pressed',String(!active));pause.setAttribute('aria-label',active?'Pausar categorías':'Reanudar categorías');pause.textContent=active?'Ⅱ':'▷';}
  const collection=event.target.closest('[data-collection]');
  if(collection){const i=Number(collection.dataset.collection),c=collections[i],stage=document.querySelector('.entrance-showcase');stage.className='entrance-showcase '+c.color;const picture=stage.querySelector('.showcase-main img');picture.src='/assets/productos/'+c.image;picture.alt=c.alt;picture.removeAttribute('srcset');const attrs=photoAttributes('assets/productos/'+c.image,'(max-width: 680px) 85vw, 600px');if(attrs){const holder=document.createElement('div');holder.innerHTML='<img '+attrs+'>';picture.srcset=holder.firstChild.srcset;picture.sizes=holder.firstChild.sizes;}stage.querySelector('figcaption span').textContent=c.name;stage.querySelector('figcaption b').textContent=`0${i+1} / 03`;stage.querySelector('.showcase-detail img').src='/assets/productos/'+c.next;document.querySelectorAll('[data-collection]').forEach(b=>b.setAttribute('aria-pressed',String(b===collection)));}
  if(event.target.closest('[data-replay-brand]'))animateBrand({force:true});
 });
 
-setInterval(()=>{if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const stage=document.querySelector('.entrance-showcase');if(!stage||stage.matches(':hover,:focus-within'))return;const buttons=[...stage.querySelectorAll('[data-collection]')],current=buttons.findIndex(b=>b.getAttribute('aria-pressed')==='true');buttons[(current+1)%buttons.length]?.click();},7000);
+setInterval(()=>{if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const stage=document.querySelector('.entrance-showcase');if(!stage||stage.matches(':hover,:focus-within')||stage.querySelector('[data-collection-pause]')?.getAttribute('aria-pressed')==='true')return;const buttons=[...stage.querySelectorAll('[data-collection]')],current=buttons.findIndex(b=>b.getAttribute('aria-pressed')==='true');buttons[(current+1)%buttons.length]?.click();},7000);

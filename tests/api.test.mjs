@@ -7,6 +7,26 @@ function req(path,method='GET',body,headers={}) {return {url:'/api/'+path,method
 async function call(handler,request) {const headers={};let body;const res={setHeader:(k,v)=>headers[k]=v,end:v=>body=JSON.parse(v)};await handler(request,res);return {status:res.statusCode,headers,body};}
 const response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
 
+test('supplier inventory API checks role and tenant and preserves idempotency and revision',async()=>{
+ let role='distributor_admin';const calls=[];
+ const handler=createHandler({env,fetcher:async(url,options)=>{
+  if(url.endsWith('/auth/v1/user'))return response({id:ids.owner,email_confirmed_at:'2026-01-01'});
+  if(url.includes('/memberships?'))return response([{organization_id:ids.org,role_id:role,status:'active'}]);
+  if(url.includes('/organizations?'))return response([{id:ids.org,status:'active',kind:'distribuidor'}]);
+  if(url.includes('/rpc/')){calls.push({url,body:JSON.parse(options.body)});return response({quantity:99});}
+  return response([]);
+ }});
+ const headers={authorization:'Bearer supplier'},body={productId:ids.product,operation:'delta',amount:-1,revision:7,requestKey:ids.order};
+ assert.equal((await call(handler,req('inventory/adjust?organization='+ids.org2,'POST',body,headers))).status,403);
+ role='seller';assert.equal((await call(handler,req('supplier/workspace?organization='+ids.org,'GET',undefined,headers))).status,403);
+ assert.equal((await call(handler,req('inventory/adjust?organization='+ids.org,'POST',body,headers))).status,403);assert.equal(calls.length,0);
+ role='distributor_admin';assert.equal((await call(handler,req('inventory/adjust?organization='+ids.org,'POST',{...body,revision:null},headers))).status,400);
+ assert.equal((await call(handler,req('inventory/adjust?organization='+ids.org,'POST',body,headers))).status,200);
+ assert.deepEqual(calls[0].body,{org:ids.org,product_key:ids.product,operation:'delta',amount:-1,expected_revision:7,request_key:ids.order});
+ assert.equal((await call(handler,req('supplier/workspace?organization='+ids.org+'&query=carro&stock=unknown','GET',undefined,headers))).status,200);
+ assert.equal(calls[1].body.search_text,'carro');
+});
+
 test('product edits require a manager, scope the write to its organization and validate price',async()=>{
  let role='distributor_admin';const writes=[];
  const handler=createHandler({env,fetcher:async(url,options)=>{

@@ -166,6 +166,15 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    const membership=ctx.memberships.find(m=>m.organization_id===org);
    if(!ctx.organizations.some(o=>o.id===org)||(!ctx.isAdmin&&!membership))throw new HttpError(403,'No tienes acceso a esta organización.');
    const can=permission=>ctx.isAdmin||ctx.permissions.some(p=>p.role_id===membership.role_id&&p.permission_id===permission);
+   if(path==='supplier/workspace'&&req.method==='GET') {
+    if(!ctx.isAdmin&&membership?.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
+    return reply(200,await service.db('rpc/supplier_workspace',{token,method:'POST',body:{org,search_text:(url.searchParams.get('query')||'').slice(0,120),stock_filter:url.searchParams.get('stock')||'all',page_offset:Math.floor(Math.max(0,Math.min(Number(url.searchParams.get('offset'))||0,100000)))}}));
+   }
+   if(path==='inventory/adjust'&&req.method==='POST') {
+    if(!ctx.isAdmin&&membership?.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
+    if(!['set','delta'].includes(body.operation)||!Number.isInteger(body.amount)||Math.abs(body.amount)>99999999||!Number.isInteger(body.revision)||body.revision<1)throw new HttpError(400,'Ajuste inválido.');
+    return reply(200,await service.db('rpc/adjust_inventory',{token,method:'POST',body:{org,product_key:validId(body.productId),operation:body.operation,amount:body.amount,expected_revision:body.revision,request_key:validId(body.requestKey)}}));
+   }
    if(path.startsWith('commercial/')&&!ctx.isAdmin&&!['distributor_admin','seller'].includes(membership?.role_id))throw new HttpError(403,'No autorizado.');
    if(path.startsWith('commercial/')&&env.VERCEL_ENV==='preview'&&req.method!=='GET'&&!ctx.organizations.find(o=>o.id===org)?.is_test)throw new HttpError(403,'Usa una organización de prueba para esta revisión.');
    if(path==='commercial/preregister'&&req.method==='POST') {

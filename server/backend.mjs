@@ -18,6 +18,10 @@ export function backend({env=process.env,fetcher=fetch}={}) {
   const response=await fetcher(url+path,{method,headers:{apikey:key,...(token?{Authorization:'Bearer '+token}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?45000:12000)});
   const data=await response.json().catch(()=>null);
   if(!response.ok) {
+   if(path==='/rest/v1/rpc/adjust_inventory') {
+    const messages=['Las existencias cambiaron. Actualiza antes de ajustar.','Confirma las existencias físicas antes de sumar o restar.','El ajuste no puede reducir las existencias por debajo de lo comprometido.','La solicitud ya se usó para otro ajuste','Referencia no encontrada','Ajuste inválido'];
+    if(messages.includes(data?.message))throw new HttpError(data.code==='40001'?409:400,data.message);
+   }
    const commercialMessages=['Selecciona productos','Productos duplicados','Cantidad inválida','Producto no habilitado','La cantidad supera la disponibilidad confirmada','Actualiza la cotización antes de enviar','Un producto ya no está habilitado. Revisa tu pedido','Demasiados pedidos. Contacta a tu vendedor','Demasiadas cotizaciones. Reintenta más tarde'];
    if(path==='/rest/v1/rpc/commercial_portal'&&commercialMessages.includes(data?.message))throw new HttpError(400,data.message);
    if(path==='/rest/v1/rpc/commercial_portal'&&[401,403].includes(response.status))throw new HttpError(403,'Este enlace no está disponible. Solicita uno nuevo a tu vendedor.');

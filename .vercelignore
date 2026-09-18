@@ -2,6 +2,7 @@
 .work
 .env*
 docs
+ANALISIS-COMERCIAL-*.md
 tests
 supabase
 node_modules

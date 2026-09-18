@@ -70,6 +70,10 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     res.setHeader('Referrer-Policy','no-referrer');
     return reply(200,await backend({env,fetcher}).db('rpc/commercial_portal',{method:'POST',body:{secret,operation:body.operation,payload:body.payload||{}}}));
    }
+   if(path==='invitation/open'&&req.method==='POST'){
+    if(!['info','exchange'].includes(body.action))throw new HttpError(400,'Operación inválida.');
+    return reply(200,await backend({env,fetcher}).request('/functions/v1/invitation-auth',{method:'POST',body:{action:body.action,token:text(body.token,72,72)}}));
+   }
    // Reject private requests before contacting an unavailable backend.
    if(!path.startsWith('auth/')&&!token)throw new HttpError(401,'Ingresa para continuar.');
    const service=backend({env,fetcher});
@@ -147,6 +151,9 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
     if(!ctx.isAdmin)throw new HttpError(403,'No autorizado.');
     await service.db('rpc/set_organization_plan',{token,method:'POST',body:{org:validId(body.id),plan:body.plan}});return reply(200,{ok:true});
    }
+   if(path==='invitation/complete'&&req.method==='POST'){
+    const id=await service.db('rpc/complete_invitation',{token,method:'POST',body:{secret:text(body.token,72,72),details:{name:text(body.name,1,100),business:body.business||''}}});return reply(200,{id});
+   }
    if(path==='invitation/accept'&&req.method==='POST') {
     const id=await service.db('rpc/accept_invitation',{token,method:'POST',body:{invitation_token:text(body.token,60,100)}});return reply(200,{id});
    }
@@ -182,7 +189,7 @@ export function createHandler({env=process.env,fetcher=fetch}={}) {
    }
    if(path==='invitations'&&req.method==='POST') {
     if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');
-    const result=await service.db('rpc/create_invitation',{token,method:'POST',body:{org,recipient_email:text(body.email,3,254),recipient_name:text(body.name,1,100),requested_role:body.role}});return reply(201,result);
+    const result=await service.request('/functions/v1/invitation-auth',{token,method:'POST',body:{action:'create',organizationId:org,email:text(body.email,3,254),name:text(body.name,1,100),role:body.role}});return reply(201,result);
    }
    if(path==='entities'&&req.method==='POST') {
     if(!ctx.isAdmin&&membership.role_id!=='distributor_admin')throw new HttpError(403,'No autorizado.');

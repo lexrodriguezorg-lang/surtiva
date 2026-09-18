@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 // tests explicitly upgrade these fixtures through all subsequent migrations.
 export async function database(through=5) {
  const db = new PGlite();
- await db.exec(`create role anon; create role authenticated; create schema auth;
- create table auth.users(id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
+ await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth;
+ create table auth.users(id uuid primary key, email text, created_at timestamptz default now(), raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
  await migrate(db,0,through);

@@ -15,7 +15,7 @@ export function config(env=process.env) {
 export function backend({env=process.env,fetcher=fetch}={}) {
  const {url,key}=config(env);
  async function request(path,{token,method='GET',body,headers={}}={}) {
-  const response=await fetcher(url+path,{method,headers:{apikey:key,...(token?{Authorization:'Bearer '+token}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
+  const response=await fetcher(url+path,{method,headers:{apikey:key,...(token?{Authorization:'Bearer '+token}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?45000:12000)});
   const data=await response.json().catch(()=>null);
   if(!response.ok) {
    const commercialMessages=['Selecciona productos','Productos duplicados','Cantidad inválida','Producto no habilitado','La cantidad supera la disponibilidad confirmada','Actualiza la cotización antes de enviar','Un producto ya no está habilitado. Revisa tu pedido','Demasiados pedidos. Contacta a tu vendedor','Demasiadas cotizaciones. Reintenta más tarde'];

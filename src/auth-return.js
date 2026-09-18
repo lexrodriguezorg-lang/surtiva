@@ -2,7 +2,7 @@ export function readAuthReturn(href) {
  const url=new URL(href),fragment=new URLSearchParams(url.hash.slice(1));
  const error=url.searchParams.get('error_code')||fragment.get('error_code')||url.searchParams.get('error')||fragment.get('error');
  const action=url.searchParams.get('auth');
- if(!error&&!url.searchParams.has('code')&&!['confirmed','recovery'].includes(action))return null;
+ if(!error&&!url.searchParams.has('code')&&!fragment.has('access_token')&&!['confirmed','recovery'].includes(action))return null;
  return {error, recovery:action==='recovery'};
 }
 

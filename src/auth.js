@@ -7,7 +7,13 @@ export function supabase() {
   const config=await response.json();
   if(!response.ok)throw new Error(config.error||'El acceso está en configuración.');
   if(!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(config.url)||!config.publishableKey?.startsWith('sb_publishable_'))throw new Error('Configuración de acceso inválida.');
-  return createClient(config.url,config.publishableKey,{auth:{flowType:'pkce',persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  // Admin invitations arrive with an implicit session, unlike our PKCE signup.
+  // Validate that session with Auth before removing the callback credentials.
+  const fragment=new URLSearchParams((location.hash||'').slice(1));
+  const invitedSession=!!new URLSearchParams(location.search||'').get('invite')&&fragment.has('access_token')&&fragment.has('refresh_token');
+  const client=createClient(config.url,config.publishableKey,{auth:{flowType:'pkce',persistSession:true,autoRefreshToken:true,detectSessionInUrl:!invitedSession}});
+  if(invitedSession){const {error}=await client.auth.setSession({access_token:fragment.get('access_token'),refresh_token:fragment.get('refresh_token')});authError(error);}
+  return client;
  }).catch(error=>{clientPromise=null;throw error;});
  return clientPromise;
 }

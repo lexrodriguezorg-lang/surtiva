@@ -84,11 +84,31 @@ function shell(content,page){
 }
 function mobileNav(page){return '<nav class="mobile-bottom-nav" aria-label="Navegación móvil"><a href="#'+(ownerMode()?'red':'inicio')+'" '+(['red','inicio'].includes(page)?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/></svg>Inicio</a><a href="#catalogo" '+(page==='catalogo'?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Catálogo</a>'+(can('orders.read')?'<a href="#pedidos" '+(page==='pedidos'?'aria-current="page"':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6Z M14 3v5h5 M9 12h7 M9 16h7"/></svg>Pedidos</a>':'')+'<button data-action="menu" aria-label="Más secciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="20" cy="12" r="1.2"/></svg>Más</button></nav>';}
 function avatarMarkup(){const picture=session?.user.avatarUrl;return picture&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(picture)?'<img src="'+picture+'" alt="">':'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>';}
-function accountDialog(){setMenu(false);dialog('Mi perfil','<div class="account-details"><div class="account-avatar large">'+avatarMarkup()+'</div><h3>'+esc(session.user.name)+'</h3><p>'+esc(session.user.email)+'</p><small>'+esc(session.isAdmin?'Administrador de Surtiva':roles[role()])+'</small></div><form id="profile-photo"><label>Foto de perfil<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required></label><small>JPG, PNG o WebP · máximo 5 MB</small><button class="btn primary">Guardar foto</button></form><hr><a class="btn light" href="#nueva-clave">Guardar o cambiar contraseña</a><button class="btn light" data-action="logout">Cerrar sesión</button>');}
-async function saveProfilePhoto(file){
+function accountDialog(){
+ setMenu(false);dialog('Mi perfil','<div class="account-details"><div class="account-avatar large">'+avatarMarkup()+'</div><h3>'+esc(session.user.name)+'</h3><p>'+esc(session.user.email)+'</p><small>'+esc(session.isAdmin?'Administrador de Surtiva':roles[role()])+'</small></div><form id="profile-photo"><label>Foto de perfil<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required aria-describedby="photo-help"></label><small id="photo-help">JPG, PNG o WebP · máximo 5 MB</small><div class="form-feedback" role="status" aria-live="polite"></div><button class="btn primary" type="submit" disabled>Guardar foto</button></form><hr><a class="btn light" href="#nueva-clave">Guardar o cambiar contraseña</a><button class="btn light" data-action="logout">Cerrar sesión</button>');
+ const form=modal.querySelector('#profile-photo'),input=form.elements.photo,button=form.querySelector('button'),feedback=form.querySelector('.form-feedback'),preview=modal.querySelector('.account-details .account-avatar');
+ input.addEventListener('change',async()=>{
+  const file=input.files[0];button.disabled=true;preview.innerHTML=avatarMarkup();feedback.textContent=file?'Preparando vista previa…':'';
+  if(!file)return;
+  try{
+   const photo=await prepareProfilePhoto(file);
+   if(!form.isConnected||input.files[0]!==file)return;
+   const image=document.createElement('img');image.src=photo;image.alt='Vista previa de tu foto';preview.replaceChildren(image);
+   feedback.textContent='Vista previa lista. Pulsa Guardar foto para aplicar el cambio.';button.disabled=false;
+  }catch(error){if(form.isConnected&&input.files[0]===file)feedback.innerHTML='<p class="form-message error">'+esc(error.message)+'</p>';}
+ });
+}
+async function prepareProfilePhoto(file){
  if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5*1024*1024)throw Error('Selecciona una imagen JPG, PNG o WebP de hasta 5 MB.');
- const bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');canvas.width=canvas.height=64;const side=Math.min(bitmap.width,bitmap.height);canvas.getContext('2d').drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,64,64);bitmap.close();
- let photo=canvas.toDataURL('image/jpeg',.5);if(photo.length>3000)photo=canvas.toDataURL('image/jpeg',.2);if(photo.length>3000)throw Error('Prueba con una foto más sencilla.');const client=await supabase();const {error}=await client.auth.updateUser({data:{avatar_url:photo}});if(error)throw Error('No se pudo guardar la foto. Intenta nuevamente.');reads.clear();session=await api('session');modal.close();await render();notify('Foto guardada');
+ let bitmap;try{bitmap=await createImageBitmap(file);}catch{throw Error('No se pudo abrir esta imagen. Prueba con otra foto JPG, PNG o WebP.');}
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const side=Math.min(bitmap.width,bitmap.height);canvas.getContext('2d').drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,64,64);bitmap.close();
+ let photo=canvas.toDataURL('image/jpeg',.5);if(photo.length>3000)photo=canvas.toDataURL('image/jpeg',.2);if(photo.length>3000)throw Error('Prueba con una foto más sencilla.');return photo;
+}
+async function saveProfilePhoto(file){
+ const form=modal.querySelector('#profile-photo'),button=form.querySelector('button'),input=form.elements.photo;button.textContent='Guardando…';input.disabled=true;form.setAttribute('aria-busy','true');
+ try{
+  const photo=await prepareProfilePhoto(file),client=await supabase();const {error}=await client.auth.updateUser({data:{avatar_url:photo}});if(error)throw Error('No se pudo guardar la foto. Intenta nuevamente.');reads.clear();session=await api('session');modal.close();await render();notify('Foto guardada');
+ }finally{button.textContent='Guardar foto';input.disabled=false;form.removeAttribute('aria-busy');}
 }
 const title=(heading,subtitle='')=>`<h1 class="section-title">${heading}</h1>${subtitle?`<p class="scope-note">${subtitle}</p>`:''}`;
 async function dashboard(){

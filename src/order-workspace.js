@@ -1,8 +1,8 @@
 import {esc,money,safeImage} from './commerce-ui.js';
-import {orderDetail,orderLabels} from './order-ui.js';
-export function createOrderWorkspace({api,dialog,notify,readonly,refresh}){
+import {orderDetail,orderLabels,orderRolePreview} from './order-ui.js';
+export function createOrderWorkspace({api,dialog,notify,readonly,previewRole,refresh}){
  let current=null,draft=[],candidates=[];
- const open=async id=>{current=await api('orders/detail?id='+encodeURIComponent(id));dialog(current.order.number,orderDetail(current,readonly()));};
+ const open=async id=>{current=await api('orders/detail?id='+encodeURIComponent(id));if(readonly()&&previewRole)current=orderRolePreview(current,previewRole());dialog(current.order.number,orderDetail(current,readonly()&&!previewRole));};
  const readDraft=()=>{document.querySelectorAll('[data-order-quantity]').forEach(input=>{const line=draft.find(i=>i.productId===input.dataset.orderQuantity);if(line)line.quantity=Number(input.value);});};
  function form(operation,body,extra=''){dialog(orderLabels[operation]+' · '+current.order.number,`<form id="order-workflow" data-operation="${operation}">${body}<label>Comentario${['edit','request_changes','note'].includes(operation)?' *':''}<textarea name="note" maxlength="1000" ${['edit','request_changes','note'].includes(operation)?'required minlength="3"':''} placeholder="Información para el equipo y el comercio"></textarea></label><div class="toolbar"><button class="btn primary" type="submit">${operation==='edit'?'Guardar cambios y recalcular':orderLabels[operation]}</button><button class="btn light" type="button" data-action="order-back">Volver al pedido</button></div></form>${extra}`);}
  function editForm(){form('edit',`<p>Modifica cantidades o quita referencias con 0. El sistema recalcula los precios por volumen y vuelve a solicitar revisión.</p><div class="order-edit-lines">${draft.map(i=>`<label><span>${esc(i.title)}<small>${esc(i.sku||'')}</small></span><input data-order-quantity="${i.productId}" aria-label="Cantidad de ${esc(i.title)}" type="number" min="0" max="99999" step="1" value="${i.quantity}" required></label>`).join('')}</div>`,`<section class="order-add"><h3>Agregar otra referencia</h3><div class="toolbar"><input id="order-product-query" type="search" placeholder="Nombre o referencia"><button class="btn light" type="button" data-action="order-search">Buscar</button></div><div id="order-product-results"></div></section>`);}
@@ -19,6 +19,7 @@ export function createOrderWorkspace({api,dialog,notify,readonly,refresh}){
   return true;
  }
  async function submit(form){if(form.id!=='order-workflow')return false;const operation=form.dataset.operation,payload=Object.fromEntries(new FormData(form));
+  if(readonly())throw Error('Estás revisando el perfil. Vuelve a tu gestión desde tu foto para guardar cambios reales.');
   if(operation==='edit'){readDraft();payload.items=draft.filter(i=>i.quantity>0).map(i=>({productId:i.productId,quantity:i.quantity}));}
   if(operation==='confirm_availability')payload.items=current.items.map(i=>({productId:i.productId,stock:payload['stock-'+i.productId]}));
   current=await api('orders/action',{method:'POST',body:{id:current.order.id,revision:current.order.revision,operation,payload}});await refresh();dialog(current.order.number,orderDetail(current,readonly()));notify('Pedido actualizado');return true;

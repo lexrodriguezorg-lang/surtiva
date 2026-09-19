@@ -1,4 +1,17 @@
 import {esc,money,safeImage} from './commerce-ui.js';
+// Preview only: server permissions remain authoritative for every real operation.
+export function orderRolePreview(data,role){
+ const o=data.order,manager=role==='distributor_admin',partner=role==='fulfillment_partner';
+ const mutable=['aprobacion','recibido'].includes(o.status),allowed=['note'];
+ if(mutable&&!partner)allowed.push('edit','cancel');
+ if(mutable&&manager)allowed.push('confirm_availability');
+ if(manager&&['aprobacion','recibido','preparando'].includes(o.status))allowed.push('assign');
+ if(manager&&mutable&&o.approval_status==='approved'&&o.availability_status==='confirmed')allowed.push('prepare');
+ if(o.status==='preparando'&&(manager||partner))allowed.push('ship');
+ if(o.status==='preparando'&&manager)allowed.push('cancel');
+ if(o.status==='despachado'&&(manager||role==='merchant'))allowed.push('deliver');
+ return {...data,actions:allowed.filter(a=>data.actions.includes(a)),items:data.items.map(i=>manager?i:{...i,stock:null,reserved:null}),assignees:manager?data.assignees.filter(a=>a.role!=='surtiva_admin'):[]};
+}
 export function orderNext(o,distributor='Distribuidor'){
  if(o.status==='cancelado'||o.status==='rechazado')return {label:'Pedido cerrado',who:'Sin acciones pendientes'};
  if(o.status==='entregado')return {label:'Entrega confirmada',who:'Compra completada'};

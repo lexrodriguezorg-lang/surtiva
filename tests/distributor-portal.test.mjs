@@ -15,9 +15,12 @@ test('distributor has a real home and optional tools within existing permissions
  assert(!base.includes('href="#vendedores"'));assert(!base.includes('review-banner'));
  const pinned=commercialShell('contenido',{role:'distributor_admin',page:'vendedores',avatar:'',pins:['vendedores'],canRead:p=>p!=='team.read'});
  assert(!pinned.includes('href="#vendedores"'));
- const tools=distributorToolsMarkup({canRead:p=>p!=='team.read'});
+ const tools=distributorToolsMarkup({canRead:p=>p!=='team.read',pins:['vendedores']});
  assert(!tools.includes('data-id="vendedores"'));assert(!tools.includes('data-id="invitaciones"'));
  assert(tools.includes('href="#clientes"'));assert(!/bloqueado|desbloquear|Pagar/i.test(tools));
+ assert(!tools.includes('aria-label="Tus accesos elegidos"'));
+ const chosen=distributorToolsMarkup({pins:['clientes']});
+ assert(chosen.includes('aria-label="Tus accesos elegidos"'));
 });
 
 test('menu choices are isolated by user, organization and preview, and never enable permissions',()=>{

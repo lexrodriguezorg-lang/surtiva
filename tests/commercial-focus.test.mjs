@@ -5,7 +5,7 @@ import {orderRolePreview} from '../src/order-ui.js';
 import {catalogMarkup} from '../src/workspace-ui.js';
 
 test('commercial roles enter their catalogue without ERP navigation or a preview banner',()=>{
- for(const role of ['distributor_admin','seller','merchant']){
+ for(const role of ['seller','merchant']){
   assert.equal(commercialRoute(role,'inicio'),'catalogo');
   assert.equal(commercialRoute(role,'proveedores'),'catalogo');
   const html=commercialShell('<h1>Catálogo</h1>',{role,page:'catalogo',avatar:'foto',name:'Duke'});

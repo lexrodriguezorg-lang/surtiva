@@ -16,7 +16,7 @@ await fs.copyFile(path.join(root, 'index.html'), path.join(out, 'index.html'));
 await fs.copyFile(path.join(root, 'commerce.html'), path.join(out, 'commerce.html'));
 
 await fs.mkdir(path.join(out, 'src'), { recursive: true });
-for (const file of ['operacion.css', 'tienda.css', 'plataforma.css', 'brand.css', 'brand-tokens.css','entrance.css','commerce.css','visits.css','catalog.css','supplier.css','commercial-shell.css','brand-categories.css']) {
+for (const file of ['operacion.css', 'tienda.css', 'plataforma.css', 'brand.css', 'brand-tokens.css','entrance.css','commerce.css','visits.css','catalog.css','supplier.css','commercial-shell.css','brand-categories.css','distributor-portal.css']) {
   await fs.copyFile(path.join(root, 'src', file), path.join(out, 'src', file));
 }
 await build({entryPoints:[path.join(root,'src/plataforma.js')],outfile:path.join(out,'src/plataforma.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true});

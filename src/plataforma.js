@@ -1,4 +1,6 @@
 import {commercialShell,commercialRoute} from './commercial-shell.js';
+import {distributorHome,distributorToolsMarkup,createDistributorPreferences,distributorTools} from './distributor-portal.js';
+import {createSupplierWorkspace} from './supplier-workspace.js';
 import {createOrderWorkspace} from './order-workspace.js';
 import {orderCards} from './order-ui.js';
 import {originalPhoto} from './product-photos.js';
@@ -45,6 +47,9 @@ const supplierMode=()=>!ownerMode()&&currentOrg()?.kind==='distribuidor'&&(!revi
 const experienceRole=()=>supplierMode()?'distributor_admin':role();
 const focusedMode=()=>!ownerMode();
 const canShop=()=>experienceRole()!=='distributor_admin'&&can('orders.create');
+const distributorPreferences=createDistributorPreferences({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
+const distributorPins=()=>distributorPreferences.read(session?.user.id,organization,reviewing());
+const supplierWorkspace=createSupplierWorkspace({api,request,organization:()=>organization,orgName:()=>currentOrg()?.name||'',readonly:reviewing,dialog,notify,refresh:()=>render(true),clearCache:()=>reads.clear()});
 let supplyProduct=null;
 const visits=visitWorkspace({api,allData,session:()=>session,organization:()=>organization,role,readonly:reviewing,dialog,notify,render,clearCache:()=>reads.clear()});
 function notify(message){const box=document.querySelector('#toast');box.textContent=message;box.classList.add('show');setTimeout(()=>box.classList.remove('show'),5000);}
@@ -84,7 +89,7 @@ function authPage(register=false){return `<header class="public-header auth-head
 function pending(){if(session?.accountStatus==='suspended')return header()+'<main id="contenido" class="pending"><span class="pill orange">Acceso suspendido</span><h1>Tu organización o membresía está suspendida.</h1><p>Contacta a la administración de Surtiva para revisar el estado de tu acceso.</p><button class="btn light" data-action="logout">Cerrar sesión</button><button class="btn primary" data-action="refresh-session">Consultar estado</button></main>';const rejected=session?.accountStatus==='rejected'||session?.request?.status==='rejected';return `<header class="public-header"><a href="#portada">${brand}</a><button class="btn light" data-action="logout">Cerrar sesión</button></header><main id="contenido" class="pending"><span class="pill orange">${rejected?'Solicitud revisada':'Acceso pendiente'}</span><h1>${rejected?'Tu solicitud no fue aprobada.':'Tu solicitud está en revisión.'}</h1><p>${rejected?'Por ahora tu cuenta no tiene acceso a una organización.':'La verificación de correo y la aprobación de Surtiva son necesarias para habilitar tu espacio.'}</p>${pendingInvite()?'<a class="btn primary" href="#catalogo">Explorar catálogo</a><a class="secondary-link" href="#nueva-clave">Guardar mi contraseña</a>':''}<button class="btn light" data-action="refresh-session">Consultar estado</button></main>`;}
 function shell(content,page){
  const owner=ownerMode(),review=reviewing();
- if(focusedMode())return commercialShell(content,{role:experienceRole(),page,avatar:avatarMarkup(),name:currentOrg()?.name||'',canRead:can});
+ if(focusedMode())return commercialShell(content,{role:experienceRole(),page,avatar:avatarMarkup(),name:currentOrg()?.name||'',canRead:can,pins:distributorPins()});
  const ownerSections=[['red','Mi gestión'],['visitas','Visitas comerciales'],['catalogo','Catálogo central'],['pedidos','Control de ventas'],['radar','Radar de clientes'],['prospeccion','Prospección'],['clientes','Clientes y comercios'],['vendedores','Equipo de ventas'],['agentes','Agentes y responsables'],['seguimiento','Seguimientos'],['cartera','Cartera'],['proveedores','Proveedores'],['inventario','Inventarios'],['organizaciones','Organizaciones'],['solicitudes','Solicitudes'],['usuarios','Usuarios'],['perfiles','Revisar perfiles']];
  const nav=owner?ownerSections:sections.filter(x=>can(x[2])).map(([id,label])=>[id,role()==='merchant'&&id==='clientes'?'Mis proveedores':supplierMode()&&id==='inicio'?'Mi operación':label]);
  if(supplierMode()){const priority=['inicio','pedidos','inventario','catalogo'];nav.sort((a,b)=>(priority.includes(a[0])?priority.indexOf(a[0]):10)-(priority.includes(b[0])?priority.indexOf(b[0]):10));}
@@ -197,7 +202,7 @@ async function render(quiet=false){
   if(!session.isAdmin&&!session.memberships.length){if(pendingInvite()&&page==='catalogo'){app.innerHTML=shell('<div class="review-banner"><span>Estamos revisando tu acceso. Mientras tanto, explora el catálogo.</span></div>'+await catalogPage(),page);}else app.innerHTML=pending();return;}
   if(!session.isAdmin)session.organizations=session.organizations.filter(o=>o.status==='active'&&session.memberships.some(m=>m.organization_id===o.id));
   if(!ownerMode()&&!reviewing()&&!session.organizations.some(o=>o.id===organization))organization=session.organizations.find(o=>o.kind!=='plataforma')?.id||session.organizations[0]?.id||'';
-  if(focusedMode()&&!pendingInvite()){const destination=commercialRoute(experienceRole(),page);if(destination!==page){location.replace('#'+destination);return;}}
+  if(focusedMode()&&!pendingInvite()){const destination=commercialRoute(experienceRole(),page,can);if(destination!==page){location.replace('#'+destination);return;}}
   if(page==='pendiente'){location.hash=session.isAdmin?'red':'inicio';return;}
   let content='';
   if(page==='red'&&session.isAdmin){workspaceMode=false;reviewState=null;content=await dashboard();}
@@ -206,6 +211,12 @@ async function render(quiet=false){
   else if(page==='radar'&&ownerMode()){const [clients,orders,followups]=await Promise.all(['clients','orders','followups'].map(allData));radarClients=clients;content=scanMarkup(clients,orders,followups,orgName);}
   else if(page==='prospeccion'&&ownerMode()){[crmProspects,crmAgents]=await Promise.all(['prospects','commercial_agents'].map(allData));content=crmMarkup(crmProspects,crmAgents);}
   else if(page==='agentes'&&ownerMode())content=await agentsPage();
+  else if(page==='inicio'&&supplierMode()){
+   const [operation,catalog]=await Promise.all([api(scoped('supplier/workspace')),api('catalog/browse?'+new URLSearchParams({supplier:organization,limit:1,published:false}))]);
+   content=distributorHome(operation,catalog,{name:currentOrg()?.name,canRead:can});
+  }
+  else if(page==='herramientas'&&experienceRole()==='distributor_admin')content=distributorToolsMarkup({canRead:can,pins:distributorPins()});
+  else if(page==='inventario'&&supplierMode()&&can('inventory.manage'))content=await supplierWorkspace.page(true);
   else if(page==='catalogo'&&can('catalog.read'))content=await catalogPage();
   else if(page==='pedidos'&&focusedMode()&&can('orders.read')){
    const orders=await data('orders','?offset='+offset);rows=orders;
@@ -220,7 +231,7 @@ async function render(quiet=false){
    if(!organization&&!ownerMode()&&!reviewing())throw Error('Primero selecciona o crea una organización.');
    const raw=await data(page==='usuarios'?'memberships':tableFor[page],'?offset='+offset);const enriched=await enrich(page,raw);if(version!==renderVersion)return;rows=enriched;
    content=title(page==='usuarios'?'Usuarios y permisos.':sections.find(s=>s[0]===page)?.[1]+'.',focusedMode()?'':page==='cumplimiento'?'Solo pedidos y movimientos de tus puntos asignados. Los pagos y conciliaciones son registros; no se procesan pagos.':page==='comisiones'?'Proyecciones según la política de tu organización. Sin procesamiento de pagos.':ownerMode()?'Datos de toda la red · cada registro conserva su organización.':'Información de '+esc(currentOrg()?.name)+'.')+`<div class="toolbar"><label>Buscar en esta página <input id="search" type="search" placeholder="Escribe para filtrar"></label>${page==='catalogo'&&can('orders.create')?`<button class="btn primary" data-action="cart">Revisar pedido (${cart.length})</button>`:''}</div><div id="data-list">${tableView(page,rows)}</div><div class="toolbar"><span class="data-summary">${rows.length} registros · Página ${offset/100+1}</span><div><button class="btn light small" data-action="previous" ${offset===0?'disabled':''}>Anterior</button> <button class="btn light small" data-action="next" ${raw.length<100?'disabled':''}>Siguiente</button></div></div>`;
-   if(ownerMode())content+=managementTools(page);
+   if(ownerMode()||supplierMode())content+=managementTools(page);
   } else content=title('Sección no disponible.','Tu cuenta no tiene permiso para acceder a esta sección.')+'<a class="btn primary" href="#inicio">Volver a mi espacio</a>';
   if(version===renderVersion){app.innerHTML=shell(content,page);setMenu(false);}
  } catch(error){if(version!==renderVersion)return;if(error.status===401){session=null;app.innerHTML=authPage(false);checkConfiguration(version);}else {const message='<div class="empty-state"><h2>No pudimos cargar esta sección.</h2><p>'+esc(error.name==='TimeoutError'?'La conexión tardó demasiado. Puedes seguir navegando o volver a intentar.':error.message)+'</p><button class="btn primary" data-action="refresh-session">Reintentar</button></div>';app.innerHTML=session?shell(message,page):header()+message;}}
@@ -319,9 +330,13 @@ async function reviewDialog(id){const request=rows.find(r=>r.id===id);dialog('Re
 document.addEventListener('click',async event=>{
  if(event.target.closest('[href="#contenido"]')){event.preventDefault();const main=document.querySelector('#contenido');main?.setAttribute('tabindex','-1');main?.focus();return;}
  const button=event.target.closest('[data-action]');if(!button)return;const {action,id}=button.dataset;button.disabled=true;
- if(reviewing()&&!['owner-home','logout','menu','close-menu','account','category','present','close','previous','next','product-detail','catalog-more','order','add-product','cart','clear-cart','remove-cart','supply-step','edit-product','order-back','order-operation','order-search','order-add','supplier-refresh','supplier-filter','supplier-page','supplier-orders','supplier-history'].includes(action)){notify('Vista de revisión: vuelve a tu gestión para hacer cambios.');button.disabled=false;return;}
+ if(reviewing()&&!['owner-home','logout','menu','close-menu','account','category','present','close','previous','next','product-detail','catalog-more','order','add-product','cart','clear-cart','remove-cart','supply-step','edit-product','order-back','order-operation','order-search','order-add','supplier-refresh','supplier-filter','supplier-page','supplier-orders','supplier-history','distributor-pin','distributor-refresh','distributor-category'].includes(action)){notify('Vista de revisión: vuelve a tu gestión para hacer cambios.');button.disabled=false;return;}
  if(ownerMode()){const row=rows.find(r=>r.id===id||r.product_id===id);if(row?.organization_id)organization=row.organization_id;}
  try {
+  if(supplierMode()&&await supplierWorkspace.action(action,button))return;
+  if(action==='distributor-refresh'&&supplierMode()){reads.clear();await render(true);}
+  if(action==='distributor-category'&&supplierMode()){catalogFilters={...catalogFilters,query:'',category:button.dataset.category||'',limit:24};location.hash='catalogo';}
+  if(action==='distributor-pin'&&experienceRole()==='distributor_admin'&&distributorTools.some(t=>t.id===id&&can(t.permission))){distributorPreferences.toggle(session.user.id,organization,id,reviewing());await render(true);document.querySelector('[data-action=distributor-pin][data-id='+id+']')?.focus();}
   if(await orderFlow.action(action,button))return;
   if(await visits.action(action,button))return;
   if(action==='account')accountDialog();
@@ -369,6 +384,7 @@ document.addEventListener('submit',async event=>{
  try{
   if(form.id==='product-supply-form'){await saveProductSupply(Number(fields.quantity));return;}
   if(form.id==='review-cart'){notify('Selección de revisión: no se envió ningún pedido. Para operar, vuelve a tu gestión desde tu perfil.');return;}
+  if(supplierMode()&&await supplierWorkspace.submit(form))return;
   if(await orderFlow.submit(form))return;
   if(await visits.submit(form,fields))return;
   if(ownerMode()&&fields.organizationContext)organization=fields.organizationContext;
@@ -423,7 +439,7 @@ document.addEventListener('keydown',event=>{
   else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
  }
 });
-document.addEventListener('input',event=>{if(event.target.id==='catalog-query'){catalogFilters.query=event.target.value;clearTimeout(catalogTimer);catalogTimer=setTimeout(()=>refreshCatalog(),280);return;}if(event.target.id==='search'){const query=event.target.value.toLocaleLowerCase('es');document.querySelector('#data-list').innerHTML=tableView(route(),rows.filter(r=>Object.values(r).some(v=>String(v).toLocaleLowerCase('es').includes(query))));}});
+document.addEventListener('input',event=>{if(supplierMode())supplierWorkspace.input(event);if(event.target.id==='catalog-query'){catalogFilters.query=event.target.value;clearTimeout(catalogTimer);catalogTimer=setTimeout(()=>refreshCatalog(),280);return;}if(event.target.id==='search'){const query=event.target.value.toLocaleLowerCase('es');document.querySelector('#data-list').innerHTML=tableView(route(),rows.filter(r=>Object.values(r).some(v=>String(v).toLocaleLowerCase('es').includes(query))));}});
 window.addEventListener('hashchange',()=>{authNotice='';offset=0;render();window.scrollTo(0,0);});
 window.addEventListener('pageshow',event=>{if(event.persisted)render();});
 window.addEventListener('focus',()=>{reads.clear();});

@@ -1,0 +1,42 @@
+/* Original palette: Marca/SURTIVA paleta final de marca - base y categorias.png.
+   Extra categories use Varios until the brand has another approved mapping. */
+.category-photo,.catalog-story,.category-tile,.category-product{--category-color:var(--category-various);--category-wash:color-mix(in srgb,var(--category-color) 11%,white);--category-on:white}
+.toys{--category-color:var(--category-toys);--category-on:var(--night)}
+.beauty{--category-color:var(--category-beauty)}
+.home{--category-color:var(--category-home)}
+.season{--category-color:var(--category-season);--category-on:var(--night)}
+.school,.other{--category-color:var(--category-various)}
+.commercial-shell{background:var(--cream);color:var(--ink)}
+.commercial-shell .commercial-header{background:color-mix(in srgb,var(--cream) 42%,white);border-bottom-color:color-mix(in srgb,var(--night) 9%,var(--cream))}
+.commercial-shell .commercial-desktop-nav a[aria-current],.commercial-shell .commercial-bottom-nav [aria-current]{color:var(--night)}
+.commercial-desktop-nav a[aria-current]:after,.commercial-bottom-nav [aria-current]:before{background:var(--accent)}
+.category-photo{background:var(--category-wash);border:1px solid color-mix(in srgb,var(--category-color) 12%,white);box-shadow:0 5px 18px #0e1b2e08}
+.category-photo:hover{border-color:var(--category-color);box-shadow:0 8px 24px #0e1b2e14}
+.category-photo .category-image,.category-photo.toys .category-image,.category-photo.beauty .category-image,.category-photo.home .category-image,.category-photo.school .category-image{background:var(--category-wash)}
+.category-photo .category-caption{background:var(--category-wash);color:var(--night);border-top:5px solid var(--category-color)}
+.category-caption small{color:#46576a}.category-caption small span{color:var(--night);font-weight:700}
+.category-photo[aria-pressed=true]{box-shadow:0 0 0 2px var(--category-color);border-color:var(--category-color)}
+.catalog-story,.catalog-story.beauty,.catalog-story.home{background:var(--category-color);color:var(--category-on)}
+/* A light tint keeps normal-size dark text above 4.5:1 on the coral cover. */
+.catalog-story.toys{background:color-mix(in srgb,var(--category-color) 85%,white)}
+.catalog-story .story-copy>span,.catalog-story .story-copy p{color:inherit;opacity:1}
+.catalog-story .story-copy button{background:white;color:var(--night);box-shadow:0 2px 10px #0e1b2e0c}
+.catalog-story .story-copy h2{color:inherit}
+.story-controls button[aria-pressed=true] span{background:var(--night)}
+.category-tile{border-color:color-mix(in srgb,var(--category-color) 20%,white);background:var(--category-wash)}
+.category-tile>span,.category-tile.toys>span,.category-tile.beauty>span,.category-tile.home>span{background:var(--category-color);color:var(--category-on)}
+.category-product .productbody,.category-product .shop-product-body{border-top:4px solid var(--category-color)}
+.category-product .productpic,.category-product .shop-photo{background:var(--category-wash)}
+.commercial-shell .restored-catalog .product{border-color:color-mix(in srgb,var(--category-color) 12%,white)}
+.commercial-shell .section-title,.commercial-shell .catalog-heading h1{color:var(--night)}
+.commercial-shell .order-ticket{border-color:#e6e1d8;border-top:4px solid var(--category-various)}
+.commercial-shell .order-ticket[data-order-step=attention]{border-top-color:var(--category-season)}
+.commercial-shell .order-ticket[data-order-step=progress]{border-top-color:var(--category-home)}
+.commercial-shell .order-ticket[data-order-step=done]{border-top-color:var(--category-home);background:color-mix(in srgb,var(--category-home) 3%,white)}
+.commercial-shell .order-ticket[data-order-step=closed]{border-top-color:var(--category-various)}
+.order-step-label{display:inline-flex;align-items:center;gap:6px;color:var(--night);font-size:12px;font-weight:650}
+.order-step-label:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--category-various)}
+[data-order-step=attention] .order-step-label:before{background:var(--category-season)}
+[data-order-step=progress] .order-step-label:before,[data-order-step=done] .order-step-label:before{background:var(--category-home)}
+.shop-main{background:var(--cream)}
+@media(prefers-reduced-motion:reduce){.category-photo{transition:none}}
